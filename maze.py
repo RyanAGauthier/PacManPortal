@@ -50,14 +50,14 @@ class Maze:
         pg.init()
         self.screen = pg.display.set_mode((1200, 800))
         self.image = pg.Surface((800, 800))
-        self.spritesheet = pg.image.load("spritesheet.png")
+        self.spritesheet = pg.image.load("resources/spritesheet.png")
         self.frame = 3
         self.rect = (0, 0, 800, 800)
         self.game = game
         self.pacman = pacman
         self.ghosts = ghosts
         self.score = score
-        self.f = open("maze.txt", 'r')
+        self.f = open("resources/maze.txt", 'r')
         self.nodes = []
         self.currentline = ""
         for p in range(31):
@@ -161,7 +161,7 @@ class Maze:
             image2 = pg.transform.scale(image2, (14 * 3, 14 * 3))
             self.screen.blit(image2, (800, 80))
             pg.display.update()
-            print("running")
+            # print("running")
             pg.time.delay(200)
 
 
