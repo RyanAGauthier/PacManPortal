@@ -1,6 +1,7 @@
 import pygame as pg
 import sys
 from vector import Vector
+
 NODESIZE = 8
 
 
@@ -14,6 +15,9 @@ class Ghost(pg.sprite.Sprite):
         self.surface = surface
         self.images = images
         self.currentframe = 0
+        self.duration = 60
+        self.velocity = Vector()
+        self.speed = 5
         self.image = images[self.currentframe]
         self.rect = rect
         self.direction = direction
@@ -24,15 +28,19 @@ class Ghost(pg.sprite.Sprite):
     def changedirection(self, newdirection):
         self.direction = newdirection
         if newdirection == "up":
+            self.velocity = self.speed * (0, -1)
             self.currentframe = 4
             self.image = self.images[self.currentframe]
         elif newdirection == "down":
+            self.velocity = self.speed * (0, 1)
             self.currentframe = 6
             self.image = self.images[self.currentframe]
         elif newdirection == "left":
+            self.velocity = self.speed * (-1, 0)
             self.currentframe = 2
             self.image = self.images[self.currentframe]
         elif newdirection == "right":
+            self.velocity = self.speed * (1, 0)
             self.currentframe = 0
             self.image = self.images[self.currentframe]
 
@@ -41,6 +49,8 @@ class Ghost(pg.sprite.Sprite):
         if self.state == "vulnerable":
             pass
         elif self.state == "dead":
+            pass
+        elif self.state == "living":
             pass
         elif self.state == "shopping":
             pass
@@ -53,24 +63,80 @@ class Ghost(pg.sprite.Sprite):
     def update(self):
         # This is the portion of the object that handles the animation, swapping between 3 and 4 legs at a rate decided
         # by self.framecount
-        if self.frameclock == 1:
-            if self.currentframe % 2 == 0:
-                self.currentframe += 1
-                self.image = self.images[self.currentframe]
+        if self.state == "dead":
+            if self.direction == "right":
+                self.currentframe = 12
+            elif self.direction == "left":
+                self.currentframe = 13
+            elif self.direction == "up":
+                self.currentframe = 14
+            elif self.direction == "down":
+                self.currentframe = 15
+        if self.state == "vulnerable":
+            if self.duration > 15:
+                self.currentframe = 8
+                self.duration -= 1
+            elif self.duration > 0:
+                self.currentframe = 10
+                self.duration -= 1
             else:
-                self.currentframe -= 1
-                self.image = self.images[self.currentframe]
-            self.frameclock = self.framecount
+                self.duration = 60
+                self.state = "alive"
+                if self.direction == "up":
+                    self.currentframe = 4
+                elif self.direction == "left":
+                    self.currentframe = 2
+                elif self.direction == "right":
+                    self.currentframe = 0
+                elif self.direction == "down":
+                    self.currentframe = 6
+        if self.frameclock == 1:
+            if self.state is not "dead":
+                if self.currentframe % 2 == 0:
+                    self.currentframe += 1
+                else:
+                    self.currentframe -= 1
+                self.frameclock = self.framecount
         else:
             self.frameclock -= 1
+        self.image = self.images[self.currentframe]
+        self.rect.left += self.velocity.x
+        self.rect.top += self.velocity.y
         #print("displaying frame {}".format(self.currentframe))
 
 
+# class DumbGhost(Ghost):
+#     def __init__(self, surface, images, rect, direction, state):
+#         super().__init__(surface=surface, images=images, rect=rect, direction=direction, state=state)
+#
+#     def draw(self):
+#         self.surface.blit(self.image, self.rect)
+#
+#     def update(self):
+#         # This is the portion of the object that handles the animation, swapping between 3 and 4 legs at a rate decided
+#         # by self.framecount
+#         if self.direction == "left":
+#             self.rect.left += -5
+#         elif self.direction == "right":
+#             self.rect.left += 5
+#         if self.frameclock == 1:
+#             if self.currentframe % 2 == 0:
+#                 self.currentframe += 1
+#                 self.image = self.images[self.currentframe]
+#             else:
+#                 self.currentframe -= 1
+#                 self.image = self.images[self.currentframe]
+#             self.frameclock = self.framecount
+#         else:
+#             self.frameclock -= 1
+#         # print("displaying frame {}".format(self.currentframe))
+
 class Pacman(pg.sprite.Sprite):
-    def __init__(self, surface, images, velocity, rect, selfnode, allnodes):
+    def __init__(self, surface, images, velocity, direction, rect, selfnode, allnodes):
         pg.sprite.Sprite.__init__(self),
         self.surface = surface
         self.velocity = velocity
+        self.direction = direction
         self.images = images
         self.currentframe = 0
         self.framecount = 5
@@ -90,6 +156,23 @@ class Pacman(pg.sprite.Sprite):
         self.rect = rect
 
     def move(self):
+        if self.direction == "up":
+            self.targetnode = self.allnodes[self.selfnode[0] - 1][self.selfnode[1]]
+            if self.targetnode.traversable and self.rect.centerx == self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centerx:
+                self.velocity = Vector(0, -4)
+        elif self.direction == "down":
+            self.targetnode = self.allnodes[self.selfnode[0] + 1][self.selfnode[1]]
+            if self.targetnode.traversable and self.rect.centerx == self.allnodes[self.selfnode[0]][ self.selfnode[1]].rect.centerx:
+                self.velocity = Vector(0, 4)
+        elif self.direction == "right":
+            self.targetnode = self.allnodes[self.selfnode[0]][self.selfnode[1] + 1]
+            if self.targetnode.traversable and self.rect.centery == self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centery:
+                self.velocity = Vector(4, 0)
+        elif self.direction == "left":
+            self.targetnode = self.allnodes[self.selfnode[0]][self.selfnode[1] - 1]
+            if self.targetnode.traversable and self.rect.centery == self.allnodes[self.selfnode[0]][  self.selfnode[1]].rect.centery:
+                self.velocity = Vector(-4, 0)
+
         if self.velocity == Vector(-4, 0):
             self.targetnode = self.allnodes[self.selfnode[0]][self.selfnode[1] - 1]
             if self.targetnode.traversable or self.rect.centerx > self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centerx:
@@ -118,7 +201,7 @@ class Pacman(pg.sprite.Sprite):
         print(self.selfnode)
         print("I'm going to:")
         print(self.targetnode)
-        print(self.targetnode.traversable)
+        print("My center is at: {}".format(self.rect.center))
 
     def update(self):
         self.move()
@@ -139,10 +222,26 @@ class Pacman(pg.sprite.Sprite):
             self.frameclock = self.framecount
         else:
             self.frameclock -= 1
-        print("displaying frame {}".format(self.currentframe))
+        #print("displaying frame {}".format(self.currentframe))
 
     def draw(self):
         self.surface.blit(self.image, self.rect)
+
+
+class DumbPacman(Pacman):
+    def __init__(self, surface, images, velocity, direction, rect, selfnode, allnodes):
+        super().__init__(surface=surface, images=images, velocity=velocity, direction=direction,
+                         rect=rect, selfnode=selfnode, allnodes=allnodes)
+
+    def move(self):
+        if self.velocity == Vector(0,-4) or self.velocity == Vector(0,4):
+            self.rect.top += self.velocity.y
+        elif self.velocity == Vector(4,0) or self.velocity == Vector(-4,0):
+            self.rect.left += self.velocity.x
+
+    # def draw(self):
+    #     self.surface.fill((0, 0, 0))
+    #     self.surface.blit(self.image, self.rect)
 
 
 class staticMember(pg.sprite.Sprite):
@@ -266,6 +365,7 @@ class Maze:
         self.game = game
         self.pacmanspeed = 4
         self.pacmanvelocity = self.pacmanspeed * Vector(-1, 0)
+        self.pacmandirection = "left"
         self.ghosts = pg.sprite.Group()
         self.ghostimages = ghostimages(self.spritesheet)
         # self.ghosts.add(Ghost("Blinky", blinky, (13 * NODESIZE, 12 * NODESIZE, 14, 14)))
@@ -289,7 +389,7 @@ class Maze:
                                                   traversable=False))
                 elif self.currentline[i] == "O":
                     self.currentnodes.append(Node(surface=self.screen, nodesize=NODESIZE,
-                                                  rect=temprect, color=(0, 255, 0), image=False, traversable=True))
+                                                  rect=temprect, color=(0, 0, 0), image=False, traversable=True))
                 elif self.currentline[i] == "P":
                     self.currentnodes.append(Node(surface=self.screen, nodesize=NODESIZE,
                                                   rect=temprect, color=(255, 255, 225), image=False, traversable=True))
@@ -332,17 +432,15 @@ class Maze:
             # the nodes are written in row, column format due to being taken in as a row of characters by f.read
             # as a result of this, the node at [row][column] is located at position [y][x]
         self.f.close()
-        print(self.nodes[0][6].traversable)
-        temptemprect = pg.Rect(0, 0, 12, 13)
+        #print(self.nodes[0][6].traversable)
+        temptemprect = pg.Rect(0, 0, 13, 13)
         temptemprect.centerx = self.nodes[self.mytop][self.myleft].rect.centerx
         temptemprect.centery = self.nodes[self.mytop][self.myleft].rect.centery
         self.pacmannodes = self.nodes
         self.pacman = Pacman(surface=self.screen, images=self.pacmanimages, velocity=self.pacmanvelocity,
-                             rect=pg.Rect(temptemprect.left, temptemprect.y, 13, 13),
+                             rect=pg.Rect(temptemprect.left, temptemprect.y, 13, 13), direction=self.pacmandirection,
                              selfnode=(self.mytop, self.myleft), allnodes=self.pacmannodes)
         self.ghosts.add(self.blinky, self.clyde, self.inky, self.pinky)
-        self.tempacman = {"color": (255, 255, 0), "rect": (self.myleft * NODESIZE, self.mytop * NODESIZE,
-                                                           NODESIZE, NODESIZE)}
 
     def __repr__(self):
         pass
@@ -360,19 +458,22 @@ class Maze:
                         sys.exit()
                     elif event.key == pg.K_w or event.key == pg.K_UP:
                         #if self.nodes[self.pacman.selfnode[0]-1][self.pacman.selfnode[1]].traversable:
-                        self.pacman.velocity = self.pacmanspeed * Vector(0, -1)
+                        self.pacman.direction = "up"#self.pacmanspeed * Vector(0, -1)
                         # if self.nodes[self.mytop - 1][self.myleft].traversable:
                         #     self.mytop -= 1
                     elif event.key == pg.K_a or event.key == pg.K_LEFT:
-                        self.pacman.velocity = self.pacmanspeed * Vector(-1, 0)
+                        self.pacman.direction = "left"
+                        #self.pacman.velocity = self.pacmanspeed * Vector(-1, 0)
                         # if self.nodes[self.mytop][self.myleft - 1].traversable:
                         #     self.myleft -= 1
                     elif event.key == pg.K_s or event.key == pg.K_DOWN:
-                        self.pacman.velocity = self.pacmanspeed * Vector(0, 1)
+                        self.pacman.direction = "down"
+                        # self.pacman.velocity = self.pacmanspeed * Vector(0, 1)
                         # if self.nodes[self.mytop + 1][self.myleft].traversable:
                         #     self.mytop += 1
                     elif event.key == pg.K_d or event.key == pg.K_RIGHT:
-                        self.pacman.velocity = self.pacmanspeed * Vector(1, 0)
+                        self.pacman.direction = "right"
+                        #self.pacman.velocity = self.pacmanspeed * Vector(1, 0)
                         # if self.nodes[self.mytop][self.myleft + 1].traversable:
                         #     self.myleft += 1
             for j in range(len(self.nodes)):
@@ -389,8 +490,96 @@ class Maze:
             self.myclock.tick(33)
 
 
+class Animator:
+    def drawtext(self, text,  x, y):
+        textobj = self.font.render(text, 1, (255, 255, 255))
+        textrect = textobj.get_rect()
+        textrect.topleft = (x, y)
+        self.surface.blit(textobj, textrect)
+
+    def __init__(self, maze):
+        self.maze = maze
+        self.surface = self.maze.screen
+        self.pacmanimages = self.maze.pacmanimages[:]
+        for i in range(len(self.pacmanimages)):
+            self.pacmanimages[i] = pg.transform.scale(self.pacmanimages[i], (60, 60))
+        self.ghostimages = self.maze.ghostimages
+        self.ghosts = self.maze.ghosts
+        self.font = pg.font.SysFont(None, 48)
+        self.animatedwindow = pg.Surface((self.surface.get_width(), self.surface.get_height()/3))
+        self.pacman = DumbPacman(surface=self.animatedwindow, images=self.pacmanimages, velocity=Vector(-4, 0),
+                                 direction="left", rect=pg.Rect(400, 200, 60, 60), selfnode=(0, 0),
+                                 allnodes=self.maze.pacmannodes)
+        self.pacman.framecount = 2
+        self.blinky = Ghost(surface = self.animatedwindow, images=self.ghostimages["blinky"],
+                            rect=pg.Rect(600, 200, 60, 60), direction="left", state ="living")
+        self.inky = Ghost(surface=self.animatedwindow, images=self.ghostimages["inky"], direction="left",
+                          rect=pg.Rect(660, 200, 60, 60),
+                          state="living")
+        self.pinky = Ghost(surface=self.animatedwindow, images=self.ghostimages["pinky"], direction="left",
+                           rect=pg.Rect(720, 200, 60, 60),
+                           state="fleeing")
+        self.clyde = Ghost(surface=self.animatedwindow, images=self.ghostimages["clyde"], direction="left",
+                           rect=pg.Rect(780, 200, 60, 60),
+                           state="fleeing")
+        self.tempghosts = pg.sprite.Group()
+        self.tempghosts.add(self.blinky, self.inky, self.pinky, self.clyde)
+
+    def showghost(self, ghostname, x, y):
+        tempblinkyimage = self.ghostimages[ghostname][0]
+        tempblinkyimage = pg.transform.scale(tempblinkyimage, (60, 60))
+        tempblinkyimagerect = tempblinkyimage.get_rect()
+        tempblinkyimagerect.topleft = (x, y)
+        pg.time.delay(1000)
+        self.surface.blit(tempblinkyimage, tempblinkyimagerect)
+        pg.display.update()
+        pg.time.delay(1000)
+        if ghostname == "blinky":
+            Animator.drawtext(self, '-Shadow', x=x + 200, y=y)
+            pg.display.update()
+            pg.time.delay(1000)
+            Animator.drawtext(self, '"Blinky"', x=x + 400, y=y)
+        elif ghostname == "pinky":
+            Animator.drawtext(self, '-Speedy', x=x + 200, y=y)
+            pg.display.update()
+            pg.time.delay(1000)
+            Animator.drawtext(self, '"Pinky"', x=x + 400, y=y)
+        elif ghostname == "inky":
+            Animator.drawtext(self, '-Bashful', x=x + 200, y=y)
+            pg.display.update()
+            pg.time.delay(1000)
+            Animator.drawtext(self, '"Inky"', x=x + 400, y=y)
+        elif ghostname == "clyde":
+            Animator.drawtext(self, '-Pokey', x=x + 200, y=y)
+            pg.display.update()
+            pg.time.delay(1000)
+            Animator.drawtext(self, '"Clyde"', x=x + 400, y=y)
+        pg.display.update()
+
+    def animate(self):
+        self.surface.fill((0, 0, 0))
+        Animator.drawtext(self, "Character / Nickname", x=400, y=0)
+        pg.display.update()
+        Animator.showghost(self, "blinky", 200, 50)
+        Animator.showghost(self, "pinky", 200, 150)
+        Animator.showghost(self, "inky", 200, 250)
+        Animator.showghost(self, "clyde", 200, 350)
+        for i in range(100):
+            pg.time.delay(100)
+            self.pacman.update()
+            self.pacman.surface.fill((0, 0, 0))
+            self.pacman.draw()
+            self.surface.blit(self.pacman.surface, (0, 400))
+            pg.display.update()
+        pg.time.delay(3000)
+        self.surface.fill((0,0,0))
+        pg.display.update()
+
+
 def main():
     maze = Maze(0, 0, 0, 0)
+    animator = Animator(maze)
+    animator.animate()
     maze.update()
 
 
