@@ -280,6 +280,7 @@ class Node:
         self.color = color
         self.traversable = traversable
         self.image = image
+        self.updated = False
 
     def __repr__(self):
         return "Node located at {}, {}. Colored {}. {}Traversable. ".format(self.rect.left, self.rect.top, self.color,
@@ -578,8 +579,8 @@ class Animator:
 
 def main():
     maze = Maze(0, 0, 0, 0)
-    animator = Animator(maze)
-    animator.animate()
+    # animator = Animator(maze)
+    # animator.animate()
     maze.update()
 
 
