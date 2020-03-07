@@ -11,13 +11,10 @@ class Ghost(pg.sprite.Sprite):
     # The class inherits from sprite so that we can later use sprite.groupcollide() between pacman and each ghost
     # Each ghost can draw and update itself, currently it just needs to implement the state parameter, which is intended
     # to tell the ghost whether it is fleeing, respawning, just eyeballs, etc
-<<<<<<< Updated upstream
-    def __init__(self, surface, images, rect, direction, state):
-=======
     def __init__(self, surface, name, images, rect, direction, state, status, selfnode, allnodes):
->>>>>>> Stashed changes
         pg.sprite.Sprite.__init__(self)
         self.surface = surface
+        self.name = name
         self.images = images
         self.currentframe = 0
         self.duration = FPS * 10
@@ -26,6 +23,9 @@ class Ghost(pg.sprite.Sprite):
         self.image = images[self.currentframe]
         self.rect = rect
         self.direction = direction
+        self.selfnode = selfnode
+        self.allnodes = allnodes
+        self.targetnode = None
         self.state = state
         self.status = status
         self.framecount = FPS // 3  # This dictates how many game frames should pass between different images
@@ -53,12 +53,6 @@ class Ghost(pg.sprite.Sprite):
     def draw(self):
         self.surface.blit(self.image, self.rect)
 
-<<<<<<< Updated upstream
-    def update(self):
-        # This is the portion of the object that handles the animation, swapping between 3 and 4 legs at a rate decided
-        # by self.framecount
-        if self.state == "dead":
-=======
     def get_target(self):
         bestnode = self.targetnode
         # If chasing
@@ -156,7 +150,6 @@ class Ghost(pg.sprite.Sprite):
                     self.currentframe = 0
         if self.status == "dead":
             # Makes the eyeballs of the ghost face the direction it's travelling in
->>>>>>> Stashed changes
             if self.direction == "right":
                 self.currentframe = 12
             elif self.direction == "left":
@@ -200,11 +193,6 @@ class Ghost(pg.sprite.Sprite):
         else:
             self.frameclock -= 1
         self.image = self.images[self.currentframe]
-<<<<<<< Updated upstream
-        self.rect.left += self.velocity.x
-        self.rect.top += self.velocity.y
-        #print("displaying frame {}".format(self.currentframe))
-=======
 
     def update(self):
 
@@ -216,7 +204,6 @@ class Ghost(pg.sprite.Sprite):
         self.move()
         self.getimage()
         print("displaying frame {}".format(self.currentframe))
->>>>>>> Stashed changes
 
 
 class DumbGhost(Ghost):
@@ -264,6 +251,7 @@ class Pacman(pg.sprite.Sprite):
             self.currentframe = 4
         self.image = self.images[self.currentframe]
         self.rect = rect
+        setdistancefrompacman(pacman=self)
 
     def move(self):
         if self.direction == "up":
@@ -283,35 +271,40 @@ class Pacman(pg.sprite.Sprite):
             if self.targetnode.traversable and self.rect.centery == self.allnodes[self.selfnode[0]][  self.selfnode[1]].rect.centery:
                 self.velocity = Vector(-4, 0)
 
+        # Checking centers to see if self node should be changed?
         if self.velocity == Vector(-4, 0):
             self.targetnode = self.allnodes[self.selfnode[0]][self.selfnode[1] - 1]
             if self.targetnode.traversable or self.rect.centerx > self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centerx:
                 self.rect.centerx += self.velocity.x
                 if self.rect.centerx < self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centerx - 4:
                     self.selfnode = (self.selfnode[0], self.selfnode[1] - 1)
+                    setdistancefrompacman(pacman=self)
         elif self.velocity == Vector(4, 0):
             self.targetnode = self.allnodes[self.selfnode[0]][self.selfnode[1] + 1]
             if self.targetnode.traversable or self.rect.centerx < self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centerx:
                 self.rect.centerx += self.velocity.x
                 if self.rect.centerx > self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centerx + 4:
                     self.selfnode = (self.selfnode[0], self.selfnode[1] + 1)
+                    setdistancefrompacman(pacman=self)
         elif self.velocity == Vector(0, 4):
             self.targetnode = self.allnodes[self.selfnode[0]+1][self.selfnode[1]]
             if self.targetnode.traversable or self.rect.centery < self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centery:
                 self.rect.centery += self.velocity.y
                 if self.rect.centery > self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centery + 4:
                     self.selfnode = (self.selfnode[0] + 1, self.selfnode[1])
+                    setdistancefrompacman(pacman=self)
         elif self.velocity == Vector(0, -4):
             self.targetnode = self.allnodes[self.selfnode[0] - 1][self.selfnode[1]]
             if self.targetnode.traversable or self.rect.centery > self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centery:
                 self.rect.centery += self.velocity.y
                 if self.rect.centery < self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centery - 4:
                     self.selfnode = (self.selfnode[0] - 1, self.selfnode[1])
-        print("I'm at:")
-        print(self.selfnode)
-        print("I'm going to:")
-        print(self.targetnode)
-        print("My center is at: {}".format(self.rect.center))
+                    setdistancefrompacman(pacman=self)
+        # print("I'm at:")
+        # print(self.selfnode)
+        # print("I'm going to:")
+        # print(self.targetnode)
+        # print("My center is at: {}".format(self.rect.center))
 
     def update(self):
         self.move()
@@ -362,7 +355,7 @@ class StaticObject(pg.sprite.Sprite):
         self.currentframe = 0
         self.rect = rect
         self.pointvalue = pointvalue
-        self.animated = animated #If animated, flicker twice a second default. This will probably just be power pills
+        self.animated = animated  # If animated, flicker twice a second default. This will probably just be power pills
         self.framecount = FPS // 2
         self.frameclock = self.framecount
 
@@ -380,6 +373,7 @@ class StaticObject(pg.sprite.Sprite):
 
     def draw(self):
         self.surface.blit(self.image, self.rect)
+
 
 def gimmesprite(rect, spritesheet, xdesired, ydesired):
     # INPUTS: Rectangle representing desired coordinates and dimensions of image on spritesheet,
@@ -409,6 +403,9 @@ class Node:
         self.color = color
         self.traversable = traversable
         self.image = image
+        self.distfrompac = 0
+        self.updated = False
+        self.edgeto = []  # List of nodes that can be traveled to
 
     def __repr__(self):
         return "Node located at {}, {}. Colored {}. {}Traversable. ".format(self.rect.left, self.rect.top, self.color,
@@ -419,6 +416,51 @@ class Node:
             pg.draw.rect(self.surface, self.color, self.rect)
         else:
             self.surface.blit(self.image, self.rect)
+
+
+# Fills out all nodes edgeto lists
+def linknodes(nodes):
+    for x in range(28):
+        for y in range(31):
+            # Out of bounds check
+            if y != 0:
+                # If current node and adjecent nodes are traversable, adds adjacent nodes to edgeto list
+                if nodes[y][x].traversable and nodes[y-1][x].traversable:
+                    nodes[y][x].edgeto.append(nodes[y-1][x])
+            if y != 30:
+                if nodes[y][x].traversable and nodes[y+1][x].traversable:
+                    nodes[y][x].edgeto.append(nodes[y+1][x])
+            if x != 0:
+                if nodes[y][x].traversable and nodes[y][x-1].traversable:
+                    nodes[y][x].edgeto.append(nodes[y][x-1])
+            if x != 27:
+                if nodes[y][x].traversable and nodes[y][x+1].traversable:
+                    nodes[y][x].edgeto.append(nodes[y][x+1])
+
+
+# Recursive driver to set nodes' distances from pacman
+def setdistancefrompacman(pacman: Pacman):
+    y, x = pacman.selfnode
+    node = pacman.allnodes[y][x]
+    node.updated = True
+    node.distfrompac = 0
+    setdistance(node)
+
+    # Reset updated in all nodes
+    for ylist in pacman.allnodes:
+        for node in ylist:
+            node.updated = False
+
+
+# Recursively sets nodes' distance from pacman
+def setdistance(node: Node):
+    # For all edges in the node
+    for edgenode in node.edgeto:
+        # if the node has not been updated
+        if (not edgenode.updated) or (edgenode.distfrompac > node.distfrompac):
+            edgenode.distfrompac = node.distfrompac + 1
+            edgenode.updated = True
+            setdistance(edgenode)
 
 
 def ghostimages(spritesheet):
@@ -457,6 +499,7 @@ def ghostimages(spritesheet):
     myDict = {"blinky": blinkyimages, "clyde": clydeimages, "inky": inkyimages, "pinky": pinkyimages}
     return myDict
 
+
 def pacmanimages(spritesheet):
     pacmanimages = []
     for i in range(20):
@@ -472,6 +515,7 @@ def pacmanimages(spritesheet):
             pacmanimages.append(gimmesprite(pg.Rect(489 + (i-8)*16, 1, 15, 15), spritesheet, 15, 15))
     return pacmanimages
 
+
 def fruitimages(spritesheet):
     fruitimages = []
     for i in range(8):
@@ -480,6 +524,7 @@ def fruitimages(spritesheet):
 
 # def miscimages(spritesheet):
 #     for i in range ()
+
 
 class Maze:
     # This class actually plays the game, but its arguments are unusued currently.
@@ -545,39 +590,20 @@ class Maze:
                     self.currentnodes.append(Node(surface=self.screen, nodesize=NODESIZE,
                                                   rect=temprect, color=(255, 255, 255), image=False, traversable=True))
                 elif self.currentline[i] == "1":
-                    self.blinky = Ghost(surface=self.screen, images=self.ghostimages["blinky"], direction="up",
+                    self.blinky = Ghost(surface=self.screen, name='blinky', images=self.ghostimages["blinky"], direction="up",
                                         rect=pg.Rect(i * NODESIZE - NODESIZE/2, j * NODESIZE - NODESIZE/2, 14, 14),
-<<<<<<< Updated upstream
-                                        state="fleeing")
-                    # ghost1 = gimmesprite(rect=pg.Rect(457, 65, 14, 14), spritesheet=self.spritesheet,
-                    #                      xdesired=NODESIZE, ydesired=NODESIZE)
-                    self.currentnodes.append(Node(surface=self.screen, nodesize=NODESIZE, rect=temprect,
-                                                  color=(0, 0, 0), image=False, traversable=True))
-                elif self.currentline[i] == "2":
-                    self.clyde = Ghost(surface=self.screen, images=self.ghostimages["clyde"], direction="up",
-                                       rect=pg.Rect(temprect.left-15, temprect.top, 14, 14), state="fleeing")
-=======
                                         state="chasing", status="alive", selfnode=(j, i), allnodes=self.nodes)
                     self.currentnodes.append(Node(surface=self.screen, nodesize=NODESIZE, rect=temprect,
                                                   color=(0, 0, 0), image=False, traversable=True))
                 elif self.currentline[i] == "2":
                     self.clyde = Ghost(surface=self.screen, name='clyde', images=self.ghostimages["clyde"],
-                                       direction="up", rect=pg.Rect(temprect.left-15, temprect.top, 14, 14),
+                                       direction="up", rect=pg.Rect(temprect.left - 15, temprect.top, 14, 14),
                                        state="fleeing", status="alive", selfnode=(j, i), allnodes=self.nodes)
->>>>>>> Stashed changes
                     self.currentnodes.append(Node(surface=self.screen, nodesize=NODESIZE, rect=temprect,
                                                   color=(0, 0, 0), image=False, traversable=True))
                 elif self.currentline[i] == "3":
-                    self.inky = Ghost(surface=self.screen, images=self.ghostimages["inky"], direction="up",
+                    self.inky = Ghost(surface=self.screen, name="inky", images=self.ghostimages["inky"], direction="up",
                                       rect=pg.Rect(temprect.left-7, temprect.top, 14, 14),
-<<<<<<< Updated upstream
-                                      state="fleeing")
-                    self.currentnodes.append(Node(surface=self.screen, nodesize=NODESIZE, rect=temprect,
-                                                  color=(0, 0, 0), image=False, traversable=True))
-                elif self.currentline[i] == "4":
-                    self.pinky = Ghost(surface=self.screen, images=self.ghostimages["pinky"], direction="up",
-                                       rect=pg.Rect(temprect.left+2, temprect.top, 14, 14), state="fleeing")
-=======
                                       state="fleeing", status="alive", selfnode=(j, i), allnodes=self.nodes)
                     self.currentnodes.append(Node(surface=self.screen, nodesize=NODESIZE, rect=temprect,
                                                   color=(0, 0, 0), image=False, traversable=True))
@@ -585,7 +611,6 @@ class Maze:
                     self.pinky = Ghost(surface=self.screen, name='pinky', images=self.ghostimages["pinky"],
                                        direction="up", rect=pg.Rect(temprect.left+2, temprect.top, 14, 14),
                                        state="fleeing", status="alive", selfnode=(j, i), allnodes=self.nodes)
->>>>>>> Stashed changes
                     self.currentnodes.append(Node(surface=self.screen, nodesize=NODESIZE, rect=temprect,
                                                   color=(0, 0, 0), image=False, traversable=True))
                 elif self.currentline[i] == "@":
@@ -597,11 +622,7 @@ class Maze:
             # the nodes are written in row, column format due to being taken in as a row of characters by f.read
             # as a result of this, the node at [row][column] is located at position [y][x]
         self.f.close()
-<<<<<<< Updated upstream
-        #print(self.nodes[0][6].traversable)
-=======
         linknodes(self.nodes)
->>>>>>> Stashed changes
         temptemprect = pg.Rect(0, 0, 13, 13)
         temptemprect.centerx = self.nodes[self.mytop][self.myleft].rect.centerx
         temptemprect.centery = self.nodes[self.mytop][self.myleft].rect.centery
@@ -781,8 +802,8 @@ class Animator:
 
 def main():
     maze = Maze(0, 0, 0, 0)
-    animator = Animator(maze)
-    animator.animate()
+    # animator = Animator(maze)
+    # animator.animate()
     maze.update()
 
 
