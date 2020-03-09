@@ -224,7 +224,7 @@ class DumbGhost(Ghost):
         if self.direction == "left":
             self.rect.left += -5
         elif self.direction == "right":
-            self.rect.left += 5
+            self.rect.left += 4
         # print("displaying frame {}".format(self.currentframe))
 
 
@@ -337,10 +337,10 @@ class DumbPacman(Pacman):
                          rect=rect, selfnode=selfnode, allnodes=allnodes)
 
     def move(self):
-        if self.velocity == Vector(0,-4) or self.velocity == Vector(0,4):
-            self.rect.top += self.velocity.y
-        elif self.velocity == Vector(4,0) or self.velocity == Vector(-4,0):
-            self.rect.left += self.velocity.x
+        if self.direction == "left":
+            self.rect.left -= 4
+        elif self.direction == "right":
+            self.rect.left += 8
 
     # def draw(self):
     #     self.surface.fill((0, 0, 0))
@@ -496,34 +496,47 @@ def ghostimages(spritesheet):
                 gimmesprite(pg.Rect((585 + 16 * (i - 12), 81, 14, 14)), spritesheet, xdesired=14, ydesired=14))
             pinkyimages.append(
                 gimmesprite(pg.Rect((585 + 16 * (i - 12), 81, 14, 14)), spritesheet, xdesired=14, ydesired=14))
-    myDict = {"blinky": blinkyimages, "clyde": clydeimages, "inky": inkyimages, "pinky": pinkyimages}
-    return myDict
+    mydict = {"blinky": blinkyimages, "clyde": clydeimages, "inky": inkyimages, "pinky": pinkyimages}
+    return mydict
 
 
 def pacmanimages(spritesheet):
-    pacmanimages = []
+    temppacmanimages = []
     for i in range(20):
         if 0 <= i < 2:
-            pacmanimages.append(gimmesprite(pg.Rect(457 + i*16, 1, 13, 13), spritesheet, 13, 13))
+            temppacmanimages.append(gimmesprite(pg.Rect(457 + i*16, 1, 13, 13), spritesheet, 13, 13))
         if 2 <= i < 4:
-            pacmanimages.append(gimmesprite(pg.Rect(457 + (i-2)*16, 17, 13, 13), spritesheet, 13, 13))
+            temppacmanimages.append(gimmesprite(pg.Rect(457 + (i-2)*16, 17, 13, 13), spritesheet, 13, 13))
         if 4 <= i < 6:
-            pacmanimages.append(gimmesprite(pg.Rect(457 + (i-4)*16, 33, 13, 13), spritesheet, 13, 13))
+            temppacmanimages.append(gimmesprite(pg.Rect(457 + (i-4)*16, 33, 13, 13), spritesheet, 13, 13))
         if 6 <= i < 8:
-            pacmanimages.append(gimmesprite(pg.Rect(457 + (i-6)*16, 49, 13, 13), spritesheet, 13, 13))
+            temppacmanimages.append(gimmesprite(pg.Rect(457 + (i-6)*16, 49, 13, 13), spritesheet, 13, 13))
         if 8 <= i:
-            pacmanimages.append(gimmesprite(pg.Rect(489 + (i-8)*16, 1, 15, 15), spritesheet, 15, 15))
-    return pacmanimages
+            temppacmanimages.append(gimmesprite(pg.Rect(489 + (i-8)*16, 1, 15, 15), spritesheet, 15, 15))
+    return temppacmanimages
 
 
 def fruitimages(spritesheet):
-    fruitimages = []
+    tempfruitimages = []
     for i in range(8):
-        fruitimages.append(gimmesprite(pg.Rect(489 + 16*i, 49, 14, 14), spritesheet, 14, 14))
-    return fruitimages
+        tempfruitimages.append(gimmesprite(pg.Rect(489 + 16*i, 49, 14, 14), spritesheet, 14, 14))
+    return tempfruitimages
 
-# def miscimages(spritesheet):
-#     for i in range ()
+
+def pointimages(spritesheet):
+    temppointimages = []
+    for i in range(12):
+        if i < 3:
+            temppointimages.append(gimmesprite(pg.Rect(456 + 16 * i, 133, 15, 7), spritesheet, 15, 7))
+        elif i == 3:
+            temppointimages.append(gimmesprite(pg.Rect(456 + 16 * i, 133, 16, 7), spritesheet, 16, 7))
+        elif 4 <= i < 8:
+            temppointimages.append(gimmesprite(pg.Rect(456 + 16 * (i-4), 148, 15, 7), spritesheet, 15, 7))
+        elif i == 8:
+            temppointimages.append(gimmesprite(pg.Rect(456 + 16 * (i - 4), 148, 18, 7), spritesheet, 18, 7))
+        elif 9 <= i < 12:
+            temppointimages.append(gimmesprite(pg.Rect(518, 164 + 16 * (i-9), 20, 7), spritesheet, 20, 7))
+    return temppointimages
 
 
 class Maze:
@@ -533,9 +546,19 @@ class Maze:
         self.myclock = pg.time.Clock()
         self.screen = pg.display.set_mode((1200, 800))
         self.image = pg.Surface((800, 800))
+        # sounds courtesy of https://www.classicgaming.cc/classics/pac-man/sounds
+        self.pacmaneating = 'pacman_chomp.wav'
+        self.sounds = [{'eat_ghost': 'eat_ghost.wav', 'munch_1': 'munch_1.wav', 'munch_2': 'munch_2.wav',
+                        'eatpowerpellet': 'power_pellet.wav', 'eatfruit': 'pacman_eatfruit.wav',
+                        'gamestart': 'game_start.wav', 'pacmandeath': 'pacman_death.wav',
+                        'ghostkilled': 'retreating.wav'}]
+        self.audio = Audio(self.sounds, self.pacmaneating, playing=False)
+        self.audio.playing = True
         self.spritesheet = pg.image.load("spritesheet.png")
         self.pacmanimages = pacmanimages(self.spritesheet)
         self.fruitimages = fruitimages(self.spritesheet)
+        self.pointimages = pointimages(self.spritesheet)
+        self.binaryindex = 0
         # self.miscimages = miscimages(self.spritesheet)
         self.frame = 36
         self.rect = (0, 0, 800, 800)
@@ -569,9 +592,12 @@ class Maze:
                                                   image=gimmesprite(temprect, self.spritesheet, 8, 8),
                                                   traversable=False))
                 elif self.currentline[i] == "O":
+                    temptemprect = pg.Rect(0, 0, 2, 2)
+                    temptemprect.centerx = temprect.centerx
+                    temptemprect.centery = temprect.centery
                     pellet = StaticObject(surface=self.screen,
-                                               image=gimmesprite(pg.Rect(8, 8, 8, 8), self.spritesheet, 8, 8),
-                                               rect=temprect, pointvalue=10)
+                                          image=gimmesprite(pg.Rect(11, 11, 2, 2), self.spritesheet, 2, 2),
+                                          rect=temptemprect, pointvalue=10)
                     pellet.add(self.pellets)
                     self.pelletsleft += 1
                     self.currentnodes.append(Node(surface=self.screen, nodesize=NODESIZE,
@@ -641,6 +667,13 @@ class Maze:
             temp.changestatus('dead')
         temp = pg.sprite.spritecollideany(sprite=self.pacman, group=self.pellets)
         if temp:
+            tempsounds = ['munch_1', 'munch_2']
+    # if self.audio.sounds['munch_1'].get_num_channels() == 0 and self.audio.sounds['munch_2'].get_num_channels() == 0:
+            self.audio.play_sound(tempsounds[self.binaryindex])
+            if self.binaryindex == 1:
+                self.binaryindex = 0
+            else:
+                self.binaryindex = 1
             self.score += temp.pointvalue
             self.pelletsleft -= 1
             self.pellets.remove(temp)
@@ -706,6 +739,34 @@ class Maze:
             self.myclock.tick(FPS)
 
 
+class Audio:   # sound(s) and background music
+    def __init__(self, sounds, background_src, playing):
+        pg.mixer.init()
+        self.sounds = {}
+        for sound in sounds:
+            for k, v in sound.items():
+                self.sounds[k] = pg.mixer.Sound(v)
+        self.background_src = background_src
+
+        self.playing = playing
+        pg.mixer.music.load(self.background_src)
+        if self.playing:
+            pg.mixer.music.play(-1, 0.0)
+
+    def play_sound(self, sound):
+        if self.playing and sound in self.sounds.keys():
+            self.sounds[sound].play()
+
+    def toggle(self):
+        self.playing = not self.playing
+        pg.mixer.music.play(-1, 0.0) if self.playing else pg.mixer.music.stop()
+
+    def game_over(self, game):
+        pg.playing = False
+        pg.mixer.music.stop()
+        self.play_sound(game.GAME_OVER_SOUND)
+
+
 class Animator:
     def drawtext(self, text,  x, y):
         textobj = self.font.render(text, 1, (255, 255, 255))
@@ -716,6 +777,13 @@ class Animator:
     def __init__(self, maze):
         self.maze = maze
         self.surface = self.maze.screen
+        self.animating = True
+        self.counter = 0
+        self.pacmancredit = "credit.wav"
+        self.sounds = [{'eat_ghost': 'eat_ghost.wav',
+                        'eatpowerpellet': 'power_pellet.wav',
+                        'gamestart': 'game_start.wav', 'munch_1': 'munch_1.wav', 'munch_2': 'munch_2.wav'}]
+        self.audio = Audio(self.sounds, self.pacmancredit, playing=False)
         self.pacmanimages = self.maze.pacmanimages[:]
         for i in range(len(self.pacmanimages)):
             self.pacmanimages[i] = pg.transform.scale(self.pacmanimages[i], (60, 60))
@@ -726,9 +794,16 @@ class Animator:
             self.ghostimages["clyde"][i] = pg.transform.scale(self.ghostimages["clyde"][i], (60, 60))
             self.ghostimages["inky"][i] = pg.transform.scale(self.ghostimages["inky"][i], (60, 60))
             self.ghostimages["pinky"][i] = pg.transform.scale(self.ghostimages["pinky"][i], (60, 60))
-        self.ghosts = self.maze.ghosts
+        self.pointimages = self.maze.pointimages[:]
+        for i in range(len(self.pointimages)):
+            self.pointimages[i] = pg.transform.scale(self.pointimages[i], (60, 20))
         self.font = pg.font.SysFont(None, 48)
-        self.animatedwindow = pg.Surface((self.surface.get_width(), self.surface.get_height()//3))
+        self.animatedwindow = pg.Surface((self.surface.get_width(), self.surface.get_height() // 3))
+        self.powerpellets = pg.sprite.Group()
+        powerpellet = StaticObject(surface=self.animatedwindow,
+                                   image=gimmesprite(pg.Rect(8, 23 * 8, 8, 8), self.maze.spritesheet, 30, 30),
+                                   rect=pg.Rect(200, 215, 30, 30), pointvalue=0)
+        powerpellet.add(self.powerpellets)
         self.pacman = DumbPacman(surface=self.animatedwindow, images=self.pacmanimages, velocity=Vector(-4, 0),
                                  direction="left", rect=pg.Rect(400, 200, 60, 60), selfnode=(0, 0),
                                  allnodes=self.maze.pacmannodes)
@@ -752,6 +827,12 @@ class Animator:
         tempblinkyimage = pg.transform.scale(tempblinkyimage, (60, 60))
         tempblinkyimagerect = tempblinkyimage.get_rect()
         tempblinkyimagerect.topleft = (x, y)
+        for event in pg.event.get():
+            if event.type == pg.QUIT:
+                sys.exit()
+            if event.type == pg.KEYDOWN:
+                if event.key == pg.K_ESCAPE:
+                    sys.exit()
         pg.time.delay(1000)
         self.surface.blit(tempblinkyimage, tempblinkyimagerect)
         pg.display.update()
@@ -759,43 +840,90 @@ class Animator:
         if ghostname == "blinky":
             Animator.drawtext(self, '-Shadow', x=x + 200, y=y)
             pg.display.update()
-            pg.time.delay(1000)
+            pg.time.delay(500)
             Animator.drawtext(self, '"Blinky"', x=x + 400, y=y)
         elif ghostname == "pinky":
             Animator.drawtext(self, '-Speedy', x=x + 200, y=y)
             pg.display.update()
-            pg.time.delay(1000)
+            pg.time.delay(500)
             Animator.drawtext(self, '"Pinky"', x=x + 400, y=y)
         elif ghostname == "inky":
             Animator.drawtext(self, '-Bashful', x=x + 200, y=y)
             pg.display.update()
-            pg.time.delay(1000)
+            pg.time.delay(500)
             Animator.drawtext(self, '"Inky"', x=x + 400, y=y)
         elif ghostname == "clyde":
             Animator.drawtext(self, '-Pokey', x=x + 200, y=y)
             pg.display.update()
-            pg.time.delay(1000)
+            pg.time.delay(500)
             Animator.drawtext(self, '"Clyde"', x=x + 400, y=y)
         pg.display.update()
 
     def animate(self):
         self.surface.fill((0, 0, 0))
+        self.audio.playing = True
+        # for i in range(len(self.maze.pointimages)):
+        #     self.surface.blit(self.maze.pointimages[i], pg.Rect(20*i, 0, 20, 20))
+        # pg.display.update()
+        # pg.time.delay(10000)
         Animator.drawtext(self, "Character / Nickname", x=400, y=0)
         pg.display.update()
         Animator.showghost(self, "blinky", 200, 50)
         Animator.showghost(self, "pinky", 200, 150)
         Animator.showghost(self, "inky", 200, 250)
         Animator.showghost(self, "clyde", 200, 350)
-        for i in range(100):
-            pg.time.delay(100)
-            self.pacman.surface.fill((0, 0, 0))
-            self.pacman.update()
-            self.tempghosts.update()
-            self.tempghosts.draw(self.pacman.surface)
-            self.pacman.draw()
-            self.surface.blit(self.pacman.surface, (0, 400))
-            pg.display.update()
-        pg.time.delay(3000)
+        for i in range(150):
+            if self.animating:
+                if self.audio.background_src is not 'power_pellet.wav':
+                    if i % 2 == 1 and not pg.mixer.get_busy():
+                        self.audio.play_sound("munch_1")
+                    elif i % 2 == 0 and not pg.mixer.get_busy:
+                        self.audio.play_sound("munch_2")
+                for event in pg.event.get():
+                    if event.type == pg.QUIT:
+                        sys.exit()
+                    if event.type == pg.KEYDOWN:
+                        if event.key == pg.K_ESCAPE:
+                            sys.exit()
+                        if event.type == pg.K_SPACE:
+                            self.animating = False
+                pg.time.delay(100)
+                self.pacman.surface.fill((0, 0, 0))
+                self.pacman.update()
+                self.pacman.draw()
+                temp = pg.sprite.spritecollideany(sprite=self.pacman, group=self.tempghosts)
+                if temp:
+                    self.tempghosts.remove(temp)
+                    self.audio.play_sound("eat_ghost")
+                    self.pacman.surface.blit(self.pointimages[self.counter], temp.rect)
+                    self.counter += 1
+                    self.tempghosts.draw(self.pacman.surface)
+                    self.surface.blit(self.pacman.surface, (0, 450))
+                    pg.display.update()
+                    pg.time.delay(200)
+                self.tempghosts.update()
+                self.tempghosts.draw(self.pacman.surface)
+                self.powerpellets.update()
+                self.powerpellets.draw(self.pacman.surface)
+                if pg.sprite.spritecollide(sprite=self.pacman, group=self.powerpellets, dokill=True):
+                    self.audio.background_src = 'power_pellet.wav'  # self.sounds[0]['eatpowerpellet']
+                    self.audio.playing = False
+                    self.audio.toggle()
+                    self.pacman.velocity = Vector(4,0)
+                    self.pacman.direction = 'right'
+                    self.blinky.changedirection('right')
+                    self.blinky.changestatus('vulnerable')
+                    self.clyde.changedirection('right')
+                    self.clyde.changestatus('vulnerable')
+                    self.inky.changedirection('right')
+                    self.inky.changestatus('vulnerable')
+                    self.pinky.changedirection('right')
+                    self.pinky.changestatus('vulnerable')
+                self.surface.blit(self.pacman.surface, (0, 450))
+                # pg.time.delay(100)
+                pg.display.update()
+        self.audio.toggle()
+        pg.time.delay(1000)
         self.surface.fill((0,0,0))
         pg.display.update()
 
