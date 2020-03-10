@@ -217,6 +217,9 @@ class Ghost(pg.sprite.Sprite):
         if self.rect.centery % 2 != 0:
             self.rect.centery += 1
 
+        leftneigh = 27 if self.selfnode[1] == 0 else self.selfnode[1] - 1
+        rightneigh = 0 if self.selfnode[1] == 27 else self.selfnode[1] + 1
+
         if self.targetnode == self.allnodes[self.selfnode[0] - 1][self.selfnode[1]]:
             self.changedirection('up')
             if self.targetnode.traversable and self.rect.centerx == \
@@ -227,12 +230,12 @@ class Ghost(pg.sprite.Sprite):
             if self.targetnode.traversable and self.rect.centerx == \
                     self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centerx:
                 self.velocity = Vector(0, 2)
-        elif self.targetnode == self.allnodes[self.selfnode[0]][self.selfnode[1] + 1]:
+        elif self.targetnode == self.allnodes[self.selfnode[0]][rightneigh]:
             self.changedirection('right')
             if self.targetnode.traversable and self.rect.centery == \
                     self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centery:
                 self.velocity = Vector(2, 0)
-        elif self.targetnode == self.allnodes[self.selfnode[0]][self.selfnode[1] - 1]:
+        elif self.targetnode == self.allnodes[self.selfnode[0]][leftneigh]:
             self.changedirection('left')
             if self.targetnode.traversable and self.rect.centery == \
                     self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centery:
@@ -245,14 +248,22 @@ class Ghost(pg.sprite.Sprite):
                     self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centerx:
                 self.rect.centerx += self.velocity.x
                 if self.rect.centerx < self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centerx - 4:
-                    self.selfnode = (self.selfnode[0], self.selfnode[1] - 1)
+                    if self.selfnode[1] != 0:
+                        self.selfnode = (self.selfnode[0], self.selfnode[1] - 1)
+                    else:
+                        self.selfnode = (self.selfnode[0], 27)
+                        self.rect.centerx = NODESIZE * 27
         elif self.velocity == Vector(2, 0):
             # self.targetnode = self.allnodes[self.selfnode[0]][self.selfnode[1] + 1]
             if self.targetnode.traversable or self.rect.centerx < \
                     self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centerx:
                 self.rect.centerx += self.velocity.x
                 if self.rect.centerx > self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centerx + 4:
-                    self.selfnode = (self.selfnode[0], self.selfnode[1] + 1)
+                    if self.selfnode[1] != 27:
+                        self.selfnode = (self.selfnode[0], self.selfnode[1] + 1)
+                    else:
+                        self.selfnode = (self.selfnode[0], 0)
+                        self.rect.centerx = 0
         elif self.velocity == Vector(0, 2):
             # self.targetnode = self.allnodes[self.selfnode[0]+1][self.selfnode[1]]
             if self.targetnode.traversable or self.rect.centery < \
