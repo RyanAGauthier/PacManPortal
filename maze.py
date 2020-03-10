@@ -388,8 +388,9 @@ class DumbGhost(Ghost):
 
 
 class Pacman(pg.sprite.Sprite):
-    def __init__(self, surface, images, velocity, direction, rect, selfnode, allnodes):
-        pg.sprite.Sprite.__init__(self),
+    def __init__(self, surface, images, velocity, direction, rect, selfnode, allnodes, maze):
+        pg.sprite.Sprite.__init__(self)
+        self.maze = maze
         self.surface = surface
         self.velocity = velocity
         self.direction = direction
@@ -524,8 +525,10 @@ class Pacman(pg.sprite.Sprite):
                         sys.exit()
             self.image = self.images[i+8]
             self.draw()
-            pg.time.delay(100)
+            tempscreen = pg.transform.scale2x(self.surface)
+            self.maze.surface.blit(tempscreen, (50, 50))
             pg.display.update()
+            pg.time.delay(100)
         for i in range(10):
             for event in pg.event.get():
                 if event.type == pg.QUIT:
@@ -542,7 +545,7 @@ class Pacman(pg.sprite.Sprite):
 class DumbPacman(Pacman):
     def __init__(self, surface, images, velocity, direction, rect, selfnode, allnodes):
         super().__init__(surface=surface, images=images, velocity=velocity, direction=direction,
-                         rect=rect, selfnode=selfnode, allnodes=allnodes)
+                         rect=rect, selfnode=selfnode, allnodes=allnodes, maze=0)
 
     def move(self):
         if self.direction == "left":
@@ -756,8 +759,9 @@ class Maze:
     def __init__(self, game, score=0):
         pg.init()
         self.myclock = pg.time.Clock()
-        self.screen = pg.display.set_mode((1200, 800))
-        self.image = pg.Surface((800, 800))
+        self.screen = pg.Surface((400, 400))
+        self.image = pg.Surface((1200, 800))
+        self.surface = pg.display.set_mode((1200, 800))
         # sounds courtesy of https://www.classicgaming.cc/classics/pac-man/sounds
         self.pacmaneating = 'pacman_chomp.ogg'
         self.sounds = [{'eat_ghost': 'eat_ghost.ogg', 'munch_1': 'munch_1.ogg', 'munch_2': 'munch_2.ogg',
@@ -781,12 +785,14 @@ class Maze:
         self.ghosts = pg.sprite.Group()
         self.ghostimages = ghostimages(self.spritesheet)
         self.score = score
+        self.highscores = [0, 0, 0]
         self.powerpellets = pg.sprite.Group()
         self.pellets = pg.sprite.Group()
         self.fruit = pg.sprite.Group()
         self.fruitspawned = False
         self.pelletsleft = 0
         self.level = 0
+        self.lives = 3
         self.font = pg.font.SysFont(None, 28)
         self.f = open("maze.txt", 'r')
         self.nodes = []
@@ -819,7 +825,7 @@ class Maze:
                 elif self.currentline[i] == "P":
                     powerpellet = StaticObject(surface=self.screen,
                                                image=gimmesprite(pg.Rect(8, 23*8, 8, 8), self.spritesheet, 8, 8),
-                                               rect=temprect, pointvalue=0)
+                                               rect=temprect, pointvalue=50)
                     self.pelletsleft += 1
                     powerpellet.add(self.powerpellets)
                     self.currentnodes.append(Node(surface=self.screen, nodesize=NODESIZE,
@@ -831,8 +837,8 @@ class Maze:
                     self.currentnodes.append(Node(surface=self.screen, nodesize=NODESIZE,
                                                   rect=temprect, color=(255, 255, 255), image=False, traversable=False))
                 elif self.currentline[i] == "1":
-                    self.blinky = Ghost(surface=self.screen, name='blinky', images=self.ghostimages["blinky"],
-                                        direction="up",
+                    self.blinky = Ghost(surface=self.screen, name='blinky',
+                                        images=self.ghostimages["blinky"], direction="up",
                                         rect=pg.Rect(i * NODESIZE - NODESIZE/2, j * NODESIZE - NODESIZE/2, 14, 14),
                                         state="chasing", status="alive", selfnode=(j, i), allnodes=self.nodes)
                     self.currentnodes.append(Node(surface=self.screen, nodesize=NODESIZE, rect=temprect,
@@ -871,9 +877,9 @@ class Maze:
         self.pacmannodes = self.nodes
         self.pacman = Pacman(surface=self.screen, images=self.pacmanimages, velocity=self.pacmanvelocity,
                              rect=pg.Rect(temptemprect.left, temptemprect.top, 13, 13), direction=self.pacmandirection,
-                             selfnode=(self.mytop, self.myleft), allnodes=self.pacmannodes)
+                             selfnode=(self.mytop, self.myleft), allnodes=self.pacmannodes, maze=self)
         self.ghosts.add(self.blinky, self.clyde, self.inky, self.pinky)
-        self.audio.toggle()
+        self.audio.playing = True
 
     def drawtext(self, text, x, y):
         textobj = self.font.render(text, 1, (255, 255, 255))
@@ -884,6 +890,8 @@ class Maze:
     def restart(self, partial=False, level=0):
         self.level = level
         if partial:  # redraw pacman and the ghosts at their spawns
+            for sound in self.audio.sounds.keys():
+                self.audio.sounds[sound].stop()
             temptemprect = pg.Rect(0, 0, 13, 13)
             temptemprect.center = self.nodes[23][13].rect.center
             self.pacman.rect = temptemprect
@@ -919,6 +927,8 @@ class Maze:
             textrect = textobj.get_rect()
             textrect.center = temprect.center
             self.screen.blit(textobj, textrect)
+            tempscreen = pg.transform.scale2x(self.screen)
+            self.surface.blit(tempscreen, (50, 50))
             pg.display.update()
         else:  # Remake everything, but keep score the same. This mainly exists once a level is completed.
             for sound in self.audio.sounds.keys():
@@ -960,7 +970,7 @@ class Maze:
                     elif self.currentline[i] == "P":
                         powerpellet = StaticObject(surface=self.screen,
                                                    image=gimmesprite(pg.Rect(8, 23 * 8, 8, 8), self.spritesheet, 8, 8),
-                                                   rect=temprect, pointvalue=0)
+                                                   rect=temprect, pointvalue=50)
                         self.pelletsleft += 1
                         powerpellet.add(self.powerpellets)
                         self.currentnodes.append(Node(surface=self.screen, nodesize=NODESIZE,
@@ -1015,7 +1025,7 @@ class Maze:
             self.pacman = Pacman(surface=self.screen, images=self.pacmanimages, velocity=self.pacmanvelocity,
                                  rect=pg.Rect(temptemprect.left, temptemprect.top, 13, 13),
                                  direction=self.pacmandirection,
-                                 selfnode=(self.mytop, self.myleft), allnodes=self.pacmannodes)
+                                 selfnode=(self.mytop, self.myleft), allnodes=self.pacmannodes, maze=self)
             self.ghosts.add(self.blinky, self.clyde, self.inky, self.pinky)
             self.screen.fill((0, 0, 0))
             for j in range(len(self.nodes)):
@@ -1031,6 +1041,8 @@ class Maze:
             textrect = textobj.get_rect()
             textrect.center = temprect.center
             self.screen.blit(textobj, textrect)
+            tempscreen = pg.transform.scale2x(self.screen)
+            self.surface.blit(tempscreen, (50, 50))
             pg.display.update()
         self.audio.playing = True
         self.audio.play_sound('gamestart')
@@ -1043,21 +1055,62 @@ class Maze:
                         sys.exit()
             pg.time.delay(100)
 
+    def gameover(self):
+        for sound in self.audio.sounds.keys():
+            self.audio.sounds[sound].stop()
+        if self.score > self.highscores[0]:
+            tempscores = self.highscores[:]
+            self.highscores[0] = self.score
+            self.highscores[1] = tempscores[0]
+            self.highscores[2] = tempscores[1]
+        elif self.highscores[0] > self.score > self.highscores[1]:
+            tempscores = self.highscores[:]
+            self.highscores[1] = self.score
+            self.highscores[2] = tempscores[1]
+        elif self.highscores[1] > self.score > self.highscores[2]:
+            self.highscores[2] = self.score
+    # File I/O help courtesy of glial's response at
+    # https://www.reddit.com/r/learnpython/comments/2emugh/how_do_i_delete_lines_in_a_text_file/
+        infile = open('maze.txt', 'r').readlines()
+        with open('maze.txt', 'w') as outfile:
+            for index, line in enumerate(infile):
+                if index != 31 and index != 32 and index != 33:
+                    outfile.write(line)
+                elif index == 31:
+                    outfile.write(str(self.highscores[0]) + "\n")
+                elif index == 32:
+                    outfile.write(str(self.highscores[1]) + "\n")
+                elif index == 33:
+                    outfile.write(str(self.highscores[2]) + "\n")
+        temprect = pg.Rect(int(13.5 * NODESIZE), 17 * NODESIZE, 8, 8)
+        textobj = self.font.render("GAME OVER", 1, (255, 255, 255))
+        textrect = textobj.get_rect()
+        textrect.center = temprect.center
+        self.screen.blit(textobj, textrect)
+        tempscreen = pg.transform.scale2x(self.screen)
+        self.surface.blit(tempscreen, (50, 50))
+        pg.display.update()
+        pg.time.delay(3000)
+        sys.exit()
+
     def __repr__(self):
         pass
 
     def checkcollisions(self):
         temp = pg.sprite.spritecollideany(sprite=self.pacman, group=self.ghosts)
         if temp and temp.status == 'vulnerable':
+            self.audio.play_sound('eat_ghost')
             temp.changestatus('dead')
         elif temp and temp.status == 'alive':
             self.audio.play_sound('pacmandeath')
+            self.lives -= 1
             self.pacman.die()
+            if self.lives == 0:
+                self.gameover()
             self.restart(partial=True)
         temp = pg.sprite.spritecollideany(sprite=self.pacman, group=self.pellets)
         if temp:
             tempsounds = ['munch_1', 'munch_2']
-    # if self.audio.sounds['munch_1'].get_num_channels() == 0 and self.audio.sounds['munch_2'].get_num_channels() == 0:
             self.audio.play_sound(tempsounds[self.binaryindex])
             if self.binaryindex == 1:
                 self.binaryindex = 0
@@ -1068,18 +1121,14 @@ class Maze:
             self.pellets.remove(temp)
         temp = pg.sprite.spritecollide(sprite=self.pacman, group=self.powerpellets, dokill=True)
         if temp:
-            print("Collision detected!")
             self.pelletsleft -= 1
-            # if self.blinky.duration == 0 and self.inky.duration == 0 and self.pinky.duration and self.clyde.duration
+            self.audio.sounds['eatpowerpellet'].stop()
             self.audio.play_sound('eatpowerpellet', args=True, loops=-1, maxtime=10000)
-            self.blinky.changestatus('vulnerable')
-            self.blinky.duration = 10 * FPS
-            self.clyde.changestatus('vulnerable')
-            self.clyde.duration = 10 * FPS
-            self.inky.changestatus('vulnerable')
-            self.inky.duration = 10 * FPS
-            self.pinky.changestatus('vulnerable')
-            self.pinky.duration = 10 * FPS
+            ghostlist = [self.blinky, self.clyde, self.inky, self.pinky]
+            for i in ghostlist:
+                if i.status != 'dead':
+                    i.changestatus('vulnerable')
+                    i.duration = 10 * FPS
         temp = pg.sprite.spritecollideany(sprite=self.pacman, group=self.fruit)
         if temp:
             self.audio.play_sound('eatfruit')
@@ -1091,12 +1140,15 @@ class Maze:
             temprect.centerx = self.nodes[17][13].rect.centerx
             temprect.centery = self.nodes[17][13].rect.centery
             fruit = StaticObject(surface=self.screen, image=self.fruitimages[self.level],
-                                 rect=temprect, pointvalue=1000)
+                                 rect=temprect, pointvalue=1000 * (self.level+1))
             fruit.add(self.fruit)
             self.fruitspawned = True
         if self.pelletsleft == 0 and not self.fruit:
             self.level += 1
-            self.restart(level=self.level)
+            if self.level < 8:
+                self.restart()
+            else:
+                self.gameover()
 
     def draw(self):
         self.game.screen.blit(self.image, self.rect)
@@ -1118,9 +1170,11 @@ class Maze:
                     elif event.key == pg.K_d or event.key == pg.K_RIGHT:
                         self.pacman.direction = "right"
                     elif event.key == pg.K_r:
-                        self.restart(partial=True)
-                    elif event.key == pg.K_p:
                         self.restart()
+                    elif event.key == pg.K_g:
+                        self.gameover()
+                    elif event.key == pg.K_l:
+                        self.level = 7
             for j in range(len(self.nodes)):
                 for node in self.nodes[j]:
                     node.draw()
@@ -1132,11 +1186,29 @@ class Maze:
             self.ghosts.update()
             self.ghosts.draw(self.screen)
             self.checkcollisions()
+            tempscreen = pg.transform.scale2x(self.screen)
+            self.surface.blit(tempscreen, (50, 50))
+            self.drawhud()
             print(self.pelletsleft)
             pg.display.update()
             print("Score = {}".format(self.score))
             print("running")
             self.myclock.tick(FPS)
+
+    def drawhud(self):
+        pg.draw.rect(self.surface, (0, 0, 0), pg.Rect(0, 0, self.surface.get_width(), 50))
+        textobj = self.font.render(str(self.score), 1, (255, 255, 255))
+        textobj = pg.transform.scale2x(textobj)
+        textrect = textobj.get_rect()
+        textrect.topright = (self.surface.get_width() // 2 - 100, 0)
+        self.surface.blit(textobj, textrect)
+        tempimages = self.pacman.images[:]
+        tempimages[1] = pg.transform.scale(tempimages[1], (50, 50))
+        for i in range(self.lives):
+            self.surface.blit(tempimages[1], (i * 60, 0))
+        for i in range(self.level):
+            self.surface.blit(pg.transform.scale(self.fruitimages[i], (50, 50)),
+                              (50 * i, 550))
 
 
 class Audio:   # sound(s) and background music
@@ -1180,9 +1252,10 @@ class Animator:
 
     def __init__(self, maze):
         self.maze = maze
-        self.surface = self.maze.screen
+        self.surface = self.maze.surface
         self.animating = True
         self.counter = 0
+        self.currentline = ""
         self.pacmancredit = "credit.ogg"
         self.sounds = [{'eat_ghost': 'eat_ghost.ogg',
                         'eatpowerpellet': 'power_pellet.ogg',
@@ -1229,37 +1302,41 @@ class Animator:
         tempblinkyimage = pg.transform.scale(tempblinkyimage, (60, 60))
         tempblinkyimagerect = tempblinkyimage.get_rect()
         tempblinkyimagerect.topleft = (x, y)
-        for event in pg.event.get():
-            if event.type == pg.QUIT:
-                sys.exit()
-            if event.type == pg.KEYDOWN:
-                if event.key == pg.K_ESCAPE:
+        if self.animating:
+            for event in pg.event.get():
+                if event.type == pg.QUIT:
                     sys.exit()
-        pg.time.delay(1000)
-        self.surface.blit(tempblinkyimage, tempblinkyimagerect)
-        pg.display.update()
-        pg.time.delay(1000)
-        if ghostname == "blinky":
-            Animator.drawtext(self, '-Shadow', x=x + 200, y=y)
+                if event.type == pg.KEYDOWN:
+                    if event.key == pg.K_ESCAPE:
+                        sys.exit()
+                    if event.key == pg.K_SPACE:
+                        self.animating = False
+            if self.animating:
+                pg.time.delay(500)
+                self.surface.blit(tempblinkyimage, tempblinkyimagerect)
+                pg.display.update()
+                pg.time.delay(500)
+                if ghostname == "blinky":
+                    Animator.drawtext(self, '-Shadow', x=x + 200, y=y)
+                    pg.display.update()
+                    pg.time.delay(500)
+                    Animator.drawtext(self, '"Blinky"', x=x + 400, y=y)
+                elif ghostname == "pinky":
+                    Animator.drawtext(self, '-Speedy', x=x + 200, y=y)
+                    pg.display.update()
+                    pg.time.delay(500)
+                    Animator.drawtext(self, '"Pinky"', x=x + 400, y=y)
+                elif ghostname == "inky":
+                    Animator.drawtext(self, '-Bashful', x=x + 200, y=y)
+                    pg.display.update()
+                    pg.time.delay(500)
+                    Animator.drawtext(self, '"Inky"', x=x + 400, y=y)
+                elif ghostname == "clyde":
+                    Animator.drawtext(self, '-Pokey', x=x + 200, y=y)
+                    pg.display.update()
+                    pg.time.delay(500)
+                    Animator.drawtext(self, '"Clyde"', x=x + 400, y=y)
             pg.display.update()
-            pg.time.delay(500)
-            Animator.drawtext(self, '"Blinky"', x=x + 400, y=y)
-        elif ghostname == "pinky":
-            Animator.drawtext(self, '-Speedy', x=x + 200, y=y)
-            pg.display.update()
-            pg.time.delay(500)
-            Animator.drawtext(self, '"Pinky"', x=x + 400, y=y)
-        elif ghostname == "inky":
-            Animator.drawtext(self, '-Bashful', x=x + 200, y=y)
-            pg.display.update()
-            pg.time.delay(500)
-            Animator.drawtext(self, '"Inky"', x=x + 400, y=y)
-        elif ghostname == "clyde":
-            Animator.drawtext(self, '-Pokey', x=x + 200, y=y)
-            pg.display.update()
-            pg.time.delay(500)
-            Animator.drawtext(self, '"Clyde"', x=x + 400, y=y)
-        pg.display.update()
 
     def menu(self):
         textplay = self.font.render("Play", 1, (255, 255, 255))
@@ -1272,6 +1349,11 @@ class Animator:
         scorerect.topleft = (self.surface.get_width() // 2 - scorerect.width//2,
                              self.surface.get_height()//2 - scorerect.height//2)
         self.surface.blit(textscore, scorerect)
+        menuimage = pg.image.load('logo.PNG')
+        menurect = menuimage.get_rect()
+        menurect.centerx = scorerect.centerx
+        menurect.top = 100
+        self.surface.blit(menuimage, menurect)
         pg.display.update()
         playing = True
         while playing:
@@ -1314,6 +1396,36 @@ class Animator:
                 if event.type == pg.MOUSEBUTTONDOWN:
                     if playrect.collidepoint(event.pos):
                         playing = False
+                    if scorerect.collidepoint(event.pos):  # Display high scores from file
+                        score1 = ""
+                        score2 = ""
+                        score3 = ""
+                        tempfile = open("maze.txt", 'r')
+                        for j in range(31):
+                            self.currentline = tempfile.read(29)
+                        self.currentline = tempfile.read(1)  # Get first characters of line
+                        while self.currentline != "\n":
+                            score1 = score1 + self.currentline
+                            self.currentline = tempfile.read(1)
+                        self.currentline = tempfile.read(1)  # Increment past newline char
+                        while self.currentline != "\n":
+                            score2 = score2 + self.currentline
+                            self.currentline = tempfile.read(1)
+                        self.currentline = tempfile.read(1)
+                        while self.currentline != "\n":
+                            score3 = score3 + self.currentline
+                            self.currentline = tempfile.read(1)
+                        tempfile.close()
+                        self.drawtext(score1, 600, 500)
+                        self.drawtext(score2, 600, 600)
+                        self.drawtext(score3, 600, 700)
+                        self.maze.highscores = [int(score1), int(score2), int(score3)]
+                        pg.display.update()
+                        # textscore = self.font.render("High Scores", 1, (255, 255, 255))
+                        # scorerect = textscore.get_rect()
+                        # scorerect.topleft = (self.surface.get_width() // 2 - scorerect.width // 2,
+                        #                      self.surface.get_height() // 2 - scorerect.height // 2)
+                        # self.surface.blit(textscore, scorerect)
                 if event.type == pg.KEYDOWN:
                     if event.key == pg.K_ESCAPE:
                         sys.exit()
@@ -1325,6 +1437,14 @@ class Animator:
         self.maze.powerpellets.draw(self.maze.screen)
         self.maze.pacman.draw()
         self.maze.ghosts.draw(self.maze.screen)
+        temprect = pg.Rect(int(13.5 * NODESIZE), 17 * NODESIZE, 8, 8)
+        textobj = self.font.render("Ready?", 1, (255, 255, 255))
+        textrect = textobj.get_rect()
+        textrect.center = temprect.center
+        self.maze.screen.blit(textobj, textrect)
+        tempscreen = pg.transform.scale2x(self.maze.screen)
+        # pg.transform.scale(self.maze.screen, (800, 800))
+        self.maze.surface.blit(tempscreen, (50, 50))
         pg.display.update()
         self.audio.playing = True
         self.audio.play_sound('gamestart')
@@ -1338,13 +1458,14 @@ class Animator:
         # pg.time.delay(10000)
         Animator.drawtext(self, "Character / Nickname", x=400, y=0)
         pg.display.update()
-        Animator.showghost(self, "blinky", 200, 50)
-        Animator.showghost(self, "pinky", 200, 150)
-        Animator.showghost(self, "inky", 200, 250)
-        Animator.showghost(self, "clyde", 200, 350)
-        animating = True
-        for i in range(150):
-            if animating:
+        if self.animating:
+            Animator.showghost(self, "blinky", 200, 50)
+            Animator.showghost(self, "pinky", 200, 150)
+            Animator.showghost(self, "inky", 200, 250)
+            Animator.showghost(self, "clyde", 200, 350)
+        # animating = True
+        for i in range(125):
+            if self.animating:
                 if self.audio.background_src is not 'power_pellet.ogg':
                     if i % 2 == 0 and not pg.mixer.get_busy():
                         self.audio.play_sound("munch_1")
@@ -1357,7 +1478,7 @@ class Animator:
                         if event.key == pg.K_ESCAPE:
                             sys.exit()
                         if event.key == pg.K_SPACE:
-                            animating = False
+                            self.animating = False
                 pg.time.delay(100)
                 self.pacman.surface.fill((0, 0, 0))
                 self.pacman.update()
@@ -1391,11 +1512,8 @@ class Animator:
                     self.pinky.changedirection('right')
                     self.pinky.changestatus('vulnerable')
                 self.surface.blit(self.pacman.surface, (0, 450))
-                # pg.time.delay(100)
                 pg.display.update()
         self.audio.toggle()
-        # self.audio.background_src = 'pacman_chomp.ogg'
-        # self.audio.toggle()
         pg.time.delay(1000)
         self.surface.fill((0, 0, 0))
         pg.display.update()
@@ -1404,9 +1522,9 @@ class Animator:
 
 
 def main():
-    maze = Maze(0, 0)
-    # animator = Animator(maze)
-    # animator.animate()
+    maze = Maze(game=0, score=0)
+    animator = Animator(maze)
+    animator.animate()
     maze.update()
 
 
