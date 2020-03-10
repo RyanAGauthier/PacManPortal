@@ -1,6 +1,7 @@
 import pygame as pg
 import sys
 from vector import Vector
+from random import randrange
 
 
 NODESIZE = 8
@@ -12,13 +13,15 @@ class Ghost(pg.sprite.Sprite):
     # The class inherits from sprite so that we can later use sprite.groupcollide() between pacman and each ghost
     # Each ghost can draw and update itself, currently it just needs to implement the state parameter, which is intended
     # to tell the ghost whether it is fleeing, respawning, just eyeballs, etc
-    def __init__(self, surface, name, images, rect, direction, state, status, selfnode, allnodes):
+
+    def __init__(self, surface, images, rect, direction, state, status, name=None, selfnode=None, allnodes=None):
         pg.sprite.Sprite.__init__(self)
         self.surface = surface
         self.name = name
         self.images = images
         self.currentframe = 0
         self.duration = FPS * 10
+        self.shopping = 0
         self.velocity = Vector()
         self.speed = 5
         self.image = images[self.currentframe]
@@ -56,7 +59,8 @@ class Ghost(pg.sprite.Sprite):
 
     def get_target(self):
         bestnode = self.targetnode
-        # If chasing
+
+        # CHASING
         if self.state == 'chasing':
             # If we are at our target node, get the next one
             if (self.allnodes[self.selfnode[0]][self.selfnode[1]] == self.targetnode) or (self.targetnode is None):
@@ -69,6 +73,141 @@ class Ghost(pg.sprite.Sprite):
                         if (node.distfrompac < bestnode.distfrompac) and node.traversable:
                             bestnode = node
 
+        # RUNNING or VULNERABLE
+        if self.state == 'fleeing' or self.status == 'vulnerable':
+            # If we are at our target node, get the next one
+            if (self.allnodes[self.selfnode[0]][self.selfnode[1]] == self.targetnode) or (
+                    self.targetnode is None):
+                # In all edgenodes/neighbors
+                for node in self.allnodes[self.selfnode[0]][self.selfnode[1]].edgeto:
+                    # Get the node with the largest distance
+                    if (bestnode is None) or (bestnode == self.targetnode):
+                        bestnode = node
+                    else:
+                        if (node.distfrompac > bestnode.distfrompac) and node.traversable:
+                            bestnode = node
+
+        # SHOPPING
+        if self.state == 'shopping':
+            # Neighbor nodes
+            up = down = left = right = None
+
+            # In all edgenodes/neighbors
+            for node in self.allnodes[self.selfnode[0]][self.selfnode[1]].edgeto:
+                # Determine direction of neighbor nodes
+                if node == self.allnodes[self.selfnode[0] - 1][self.selfnode[1]]:
+                    up = node
+                if node == self.allnodes[self.selfnode[0] + 1][self.selfnode[1]]:
+                    down = node
+                if node == self.allnodes[self.selfnode[0]][self.selfnode[1] + 1]:
+                    right = node
+                if node == self.allnodes[self.selfnode[0]][self.selfnode[1] - 1]:
+                    left = node
+
+            # If we are at our target node, get the next one
+            if (self.allnodes[self.selfnode[0]][self.selfnode[1]] == self.targetnode) or (
+                    self.targetnode is None):
+                shoptime = 8
+                # Depending on direction
+                if self.direction == 'up':
+                    # If cant continue in the direction, or shopping time is up, try to turn
+                    if (up is None) or (self.shopping == 0):
+                        # if pinky turn opposite to other ghosts
+                        if self.name == 'pinky':
+                            if left is not None:
+                                bestnode = left
+                            elif up is not None:
+                                bestnode = up
+                            else:
+                                bestnode = right
+                        else:
+                            if right is not None:
+                                bestnode = right
+                            elif up is not None:
+                                bestnode = up
+                            else:
+                                bestnode = left
+                        self.shopping = randrange(shoptime)
+                    # Unable to turn and can continue
+                    else:
+                        bestnode = up
+                        self.shopping -= 1
+                # Direction
+                elif self.direction == 'down':
+                    # If cant continue in the direction, or shopping time is up, try to turn
+                    if (down is None) or (self.shopping == 0):
+                        # if pinky turn opposite to other ghosts
+                        if self.name == 'pinky':
+                            if right is not None:
+                                bestnode = right
+                            elif down is not None:
+                                bestnode = down
+                            else:
+                                bestnode = left
+                        else:
+                            if left is not None:
+                                bestnode = left
+                            elif down is not None:
+                                bestnode = down
+                            else:
+                                bestnode = right
+                        self.shopping = randrange(shoptime)
+                    # Unable to turn and can continue
+                    else:
+                        bestnode = down
+                        self.shopping -= 1
+                # Direction
+                elif self.direction == 'right':
+                    # If cant continue in the direction, or shopping time is up, try to turn
+                    if (right is None) or (self.shopping == 0):
+                        # if pinky turn opposite to other ghosts
+                        if self.name == 'pinky':
+                            if up is not None:
+                                bestnode = up
+                            elif right is not None:
+                                bestnode = right
+                            else:
+                                bestnode = down
+                        else:
+                            if down is not None:
+                                bestnode = down
+                            elif right is not None:
+                                bestnode = right
+                            else:
+                                bestnode = up
+                        self.shopping = randrange(shoptime)
+                    # Unable to turn and can continue
+                    else:
+                        bestnode = right
+                        self.shopping -= 1
+                # Direction
+                elif self.direction == 'left':
+                    # If cant continue in the direction, or shopping time is up, try to turn
+                    if (left is None) or (self.shopping == 0):
+                        # if pinky turn opposite to other ghosts
+                        if self.name == 'pinky':
+                            if down is not None:
+                                bestnode = down
+                            elif left is not None:
+                                bestnode = left
+                            else:
+                                bestnode = up
+                        else:
+                            if up is not None:
+                                bestnode = up
+                            elif left is not None:
+                                bestnode = left
+                            else:
+                                bestnode = down
+                        self.shopping = randrange(shoptime)
+                    # Unable to turn and can continue
+                    else:
+                        bestnode = left
+                        self.shopping -= 1
+            else:
+                # Haven't reached target node
+                return bestnode
+
         return bestnode
 
     def move(self):
@@ -80,43 +219,51 @@ class Ghost(pg.sprite.Sprite):
 
         if self.targetnode == self.allnodes[self.selfnode[0] - 1][self.selfnode[1]]:
             self.changedirection('up')
-            if self.targetnode.traversable and self.rect.centerx == self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centerx:
+            if self.targetnode.traversable and self.rect.centerx == \
+                    self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centerx:
                 self.velocity = Vector(0, -2)
         elif self.targetnode == self.allnodes[self.selfnode[0] + 1][self.selfnode[1]]:
             self.changedirection('down')
-            if self.targetnode.traversable and self.rect.centerx == self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centerx:
+            if self.targetnode.traversable and self.rect.centerx == \
+                    self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centerx:
                 self.velocity = Vector(0, 2)
         elif self.targetnode == self.allnodes[self.selfnode[0]][self.selfnode[1] + 1]:
             self.changedirection('right')
-            if self.targetnode.traversable and self.rect.centery == self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centery:
+            if self.targetnode.traversable and self.rect.centery == \
+                    self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centery:
                 self.velocity = Vector(2, 0)
         elif self.targetnode == self.allnodes[self.selfnode[0]][self.selfnode[1] - 1]:
             self.changedirection('left')
-            if self.targetnode.traversable and self.rect.centery == self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centery:
+            if self.targetnode.traversable and self.rect.centery == \
+                    self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centery:
                 self.velocity = Vector(-2, 0)
 
         # Checking centers to see if self node should be changed?
         if self.velocity == Vector(-2, 0):
             # self.targetnode = self.allnodes[self.selfnode[0]][self.selfnode[1] - 1]
-            if self.targetnode.traversable or self.rect.centerx > self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centerx:
+            if self.targetnode.traversable or self.rect.centerx > \
+                    self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centerx:
                 self.rect.centerx += self.velocity.x
                 if self.rect.centerx < self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centerx - 4:
                     self.selfnode = (self.selfnode[0], self.selfnode[1] - 1)
         elif self.velocity == Vector(2, 0):
             # self.targetnode = self.allnodes[self.selfnode[0]][self.selfnode[1] + 1]
-            if self.targetnode.traversable or self.rect.centerx < self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centerx:
+            if self.targetnode.traversable or self.rect.centerx < \
+                    self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centerx:
                 self.rect.centerx += self.velocity.x
                 if self.rect.centerx > self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centerx + 4:
                     self.selfnode = (self.selfnode[0], self.selfnode[1] + 1)
         elif self.velocity == Vector(0, 2):
             # self.targetnode = self.allnodes[self.selfnode[0]+1][self.selfnode[1]]
-            if self.targetnode.traversable or self.rect.centery < self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centery:
+            if self.targetnode.traversable or self.rect.centery < \
+                    self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centery:
                 self.rect.centery += self.velocity.y
                 if self.rect.centery > self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centery + 4:
                     self.selfnode = (self.selfnode[0] + 1, self.selfnode[1])
         elif self.velocity == Vector(0, -2):
             # self.targetnode = self.allnodes[self.selfnode[0] - 1][self.selfnode[1]]
-            if self.targetnode.traversable or self.rect.centery > self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centery:
+            if self.targetnode.traversable or self.rect.centery > \
+                    self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centery:
                 self.rect.centery += self.velocity.y
                 if self.rect.centery < self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centery - 4:
                     self.selfnode = (self.selfnode[0] - 1, self.selfnode[1])
@@ -257,46 +404,74 @@ class Pacman(pg.sprite.Sprite):
     def move(self):
         if self.direction == "up":
             self.targetnode = self.allnodes[self.selfnode[0] - 1][self.selfnode[1]]
-            if self.targetnode.traversable and self.rect.centerx == self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centerx:
+            if self.targetnode.traversable and self.rect.centerx == \
+                    self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centerx:
                 self.velocity = Vector(0, -4)
         elif self.direction == "down":
             self.targetnode = self.allnodes[self.selfnode[0] + 1][self.selfnode[1]]
-            if self.targetnode.traversable and self.rect.centerx == self.allnodes[self.selfnode[0]][ self.selfnode[1]].rect.centerx:
+            if self.targetnode.traversable and self.rect.centerx == \
+                    self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centerx:
                 self.velocity = Vector(0, 4)
         elif self.direction == "right":
-            self.targetnode = self.allnodes[self.selfnode[0]][self.selfnode[1] + 1]
-            if self.targetnode.traversable and self.rect.centery == self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centery:
+            if self.selfnode[1] != 27:
+                self.targetnode = self.allnodes[self.selfnode[0]][self.selfnode[1] + 1]
+            else:
+                self.targetnode = self.allnodes[self.selfnode[0]][0]
+            if self.targetnode.traversable and self.rect.centery == \
+                    self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centery:
                 self.velocity = Vector(4, 0)
         elif self.direction == "left":
-            self.targetnode = self.allnodes[self.selfnode[0]][self.selfnode[1] - 1]
-            if self.targetnode.traversable and self.rect.centery == self.allnodes[self.selfnode[0]][  self.selfnode[1]].rect.centery:
+            if self.selfnode[1] != 0:
+                self.targetnode = self.allnodes[self.selfnode[0]][self.selfnode[1] - 1]
+            else:
+                self.targetnode = self.allnodes[self.selfnode[0]][27]
+            if self.targetnode.traversable and self.rect.centery == \
+                    self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centery:
                 self.velocity = Vector(-4, 0)
 
         # Checking centers to see if self node should be changed?
         if self.velocity == Vector(-4, 0):
-            self.targetnode = self.allnodes[self.selfnode[0]][self.selfnode[1] - 1]
-            if self.targetnode.traversable or self.rect.centerx > self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centerx:
+            if self.selfnode[1] != 0:
+                self.targetnode = self.allnodes[self.selfnode[0]][self.selfnode[1] - 1]
+            else:
+                self.targetnode = self.allnodes[self.selfnode[0]][27]
+            if self.targetnode.traversable or self.rect.centerx > \
+                    self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centerx:
                 self.rect.centerx += self.velocity.x
                 if self.rect.centerx < self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centerx - 4:
-                    self.selfnode = (self.selfnode[0], self.selfnode[1] - 1)
+                    if self.selfnode[1] != 0:
+                        self.selfnode = (self.selfnode[0], self.selfnode[1] - 1)
+                    else:
+                        self.selfnode = (self.selfnode[0], 27)
+                        self.rect.centerx = NODESIZE * 27
                     setdistancefrompacman(pacman=self)
         elif self.velocity == Vector(4, 0):
-            self.targetnode = self.allnodes[self.selfnode[0]][self.selfnode[1] + 1]
-            if self.targetnode.traversable or self.rect.centerx < self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centerx:
+            if self.selfnode[1] != 27:
+                self.targetnode = self.allnodes[self.selfnode[0]][self.selfnode[1] + 1]
+            else:
+                self.targetnode = self.allnodes[self.selfnode[0]][0]
+            if self.targetnode.traversable or self.rect.centerx < \
+                    self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centerx:
                 self.rect.centerx += self.velocity.x
                 if self.rect.centerx > self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centerx + 4:
-                    self.selfnode = (self.selfnode[0], self.selfnode[1] + 1)
+                    if self.selfnode[1] != 27:
+                        self.selfnode = (self.selfnode[0], self.selfnode[1] + 1)
+                    else:
+                        self.selfnode = (self.selfnode[0], 0)
+                        self.rect.centerx = 0
                     setdistancefrompacman(pacman=self)
         elif self.velocity == Vector(0, 4):
             self.targetnode = self.allnodes[self.selfnode[0]+1][self.selfnode[1]]
-            if self.targetnode.traversable or self.rect.centery < self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centery:
+            if self.targetnode.traversable or self.rect.centery < \
+                    self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centery:
                 self.rect.centery += self.velocity.y
                 if self.rect.centery > self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centery + 4:
                     self.selfnode = (self.selfnode[0] + 1, self.selfnode[1])
                     setdistancefrompacman(pacman=self)
         elif self.velocity == Vector(0, -4):
             self.targetnode = self.allnodes[self.selfnode[0] - 1][self.selfnode[1]]
-            if self.targetnode.traversable or self.rect.centery > self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centery:
+            if self.targetnode.traversable or self.rect.centery > \
+                    self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centery:
                 self.rect.centery += self.velocity.y
                 if self.rect.centery < self.allnodes[self.selfnode[0]][self.selfnode[1]].rect.centery - 4:
                     self.selfnode = (self.selfnode[0] - 1, self.selfnode[1])
@@ -326,7 +501,7 @@ class Pacman(pg.sprite.Sprite):
             self.frameclock = self.framecount
         else:
             self.frameclock -= 1
-        #print("displaying frame {}".format(self.currentframe))
+        # print("displaying frame {}".format(self.currentframe))
 
     def die(self):
         for i in range(12):
@@ -391,7 +566,7 @@ class StaticObject(pg.sprite.Sprite):
                 self.frameclock = self.framecount
             else:
                 self.frameclock -= 1
-            #self.image = self.images[self.currentframe]
+            # self.image = self.images[self.currentframe]
 
     def draw(self):
         self.surface.blit(self.image, self.rect)
@@ -458,6 +633,10 @@ def linknodes(nodes):
             if x != 27:
                 if nodes[y][x].traversable and nodes[y][x+1].traversable:
                     nodes[y][x].edgeto.append(nodes[y][x+1])
+
+    if nodes[14][0].traversable and nodes[14][27].traversable:
+        nodes[14][0].edgeto.append(nodes[14][27])
+        nodes[14][27].edgeto.append(nodes[14][0])
 
 
 # Recursive driver to set nodes' distances from pacman
@@ -563,7 +742,7 @@ def pointimages(spritesheet):
 
 class Maze:
     # This class actually plays the game, but its arguments are unusued currently.
-    def __init__(self, game, pacman, ghosts, score=0):
+    def __init__(self, game, score=0):
         pg.init()
         self.myclock = pg.time.Clock()
         self.screen = pg.display.set_mode((1200, 800))
@@ -639,9 +818,10 @@ class Maze:
                                                   rect=temprect, color=(0, 0, 0), image=False, traversable=True))
                 elif self.currentline[i] == "G":
                     self.currentnodes.append(Node(surface=self.screen, nodesize=NODESIZE,
-                                                  rect=temprect, color=(255, 255, 255), image=False, traversable=True))
+                                                  rect=temprect, color=(255, 255, 255), image=False, traversable=False))
                 elif self.currentline[i] == "1":
-                    self.blinky = Ghost(surface=self.screen, name='blinky', images=self.ghostimages["blinky"], direction="up",
+                    self.blinky = Ghost(surface=self.screen, name='blinky', images=self.ghostimages["blinky"],
+                                        direction="up",
                                         rect=pg.Rect(i * NODESIZE - NODESIZE/2, j * NODESIZE - NODESIZE/2, 14, 14),
                                         state="chasing", status="alive", selfnode=(j, i), allnodes=self.nodes)
                     self.currentnodes.append(Node(surface=self.screen, nodesize=NODESIZE, rect=temprect,
@@ -653,8 +833,8 @@ class Maze:
                     self.currentnodes.append(Node(surface=self.screen, nodesize=NODESIZE, rect=temprect,
                                                   color=(0, 0, 0), image=False, traversable=True))
                 elif self.currentline[i] == "3":
-                    self.inky = Ghost(surface=self.screen, name="inky", images=self.ghostimages["inky"], direction="up",
-                                      rect=pg.Rect(temprect.left-7, temprect.top, 14, 14),
+                    self.inky = Ghost(surface=self.screen, name="inky", images=self.ghostimages["inky"],
+                                      direction="up", rect=pg.Rect(temprect.left-7, temprect.top, 14, 14),
                                       state="fleeing", status="alive", selfnode=(j, i), allnodes=self.nodes)
                     self.currentnodes.append(Node(surface=self.screen, nodesize=NODESIZE, rect=temprect,
                                                   color=(0, 0, 0), image=False, traversable=True))
@@ -674,6 +854,7 @@ class Maze:
             # as a result of this, the node at [row][column] is located at position [y][x]
         self.f.close()
         linknodes(self.nodes)
+
         temptemprect = pg.Rect(0, 0, 13, 13)
         temptemprect.center = self.nodes[self.mytop][self.myleft].rect.center
         self.pacmannodes = self.nodes
@@ -690,11 +871,12 @@ class Maze:
         self.screen.blit(textobj, textrect)
 
     def restart(self, partial=False, level=0):
+        self.level = level
         if partial:  # redraw pacman and the ghosts at their spawns
             temptemprect = pg.Rect(0, 0, 13, 13)
             temptemprect.center = self.nodes[23][13].rect.center
             self.pacman.rect = temptemprect
-            self.pacman.velocity = self.pacmanspeed * Vector(-4,0)
+            self.pacman.velocity = self.pacmanspeed * Vector(-4, 0)
             self.pacman.direction = 'left'
             self.pacman.selfnode = (23, 13)
             self.pacman.image = self.pacman.images[2]
@@ -877,7 +1059,7 @@ class Maze:
         if temp:
             print("Collision detected!")
             self.pelletsleft -= 1
-            #if self.blinky.duration == 0 and self.inky.duration == 0 and self.pinky.duration and self.clyde.duration
+            # if self.blinky.duration == 0 and self.inky.duration == 0 and self.pinky.duration and self.clyde.duration
             self.audio.play_sound('eatpowerpellet', args=True, loops=-1, maxtime=10000)
             self.blinky.changestatus('vulnerable')
             self.blinky.duration = 10 * FPS
@@ -1021,16 +1203,13 @@ class Animator:
                                  allnodes=self.maze.pacmannodes)
         self.pacman.framecount = 2
         self.blinky = DumbGhost(surface=self.animatedwindow, name="blinky", images=self.ghostimages["blinky"],
-                            rect=pg.Rect(600, 200, 60, 60), direction="left",state="chasing", status="alive")
-        self.inky = DumbGhost(surface=self.animatedwindow, name="inky", images=self.ghostimages["inky"], direction="left",
-                          rect=pg.Rect(660, 200, 60, 60), state="chasing",
-                          status="alive")
-        self.pinky = DumbGhost(surface=self.animatedwindow, name="pinky", images=self.ghostimages["pinky"], direction="left",
-                           rect=pg.Rect(720, 200, 60, 60), state="chasing",
-                           status="alive")
-        self.clyde = DumbGhost(surface=self.animatedwindow, name="clyde", images=self.ghostimages["clyde"], direction="left",
-                           rect=pg.Rect(780, 200, 60, 60), state="chasing",
-                           status="alive")
+                                rect=pg.Rect(600, 200, 60, 60), direction="left", state="chasing", status="alive")
+        self.inky = DumbGhost(surface=self.animatedwindow, name="inky", images=self.ghostimages["inky"],
+                              direction="left", rect=pg.Rect(660, 200, 60, 60), state="chasing", status="alive")
+        self.pinky = DumbGhost(surface=self.animatedwindow, name="pinky", images=self.ghostimages["pinky"],
+                               direction="left", rect=pg.Rect(720, 200, 60, 60), state="chasing", status="alive")
+        self.clyde = DumbGhost(surface=self.animatedwindow, name="clyde", images=self.ghostimages["clyde"],
+                               direction="left", rect=pg.Rect(780, 200, 60, 60), state="chasing", status="alive")
         self.tempghosts = pg.sprite.Group()
         self.tempghosts.add(self.blinky, self.inky, self.pinky, self.clyde)
 
@@ -1190,7 +1369,7 @@ class Animator:
                     self.audio.background_src = 'power_pellet.ogg'  # self.sounds[0]['eatpowerpellet']
                     self.audio.playing = False
                     self.audio.toggle()
-                    self.pacman.velocity = Vector(4,0)
+                    self.pacman.velocity = Vector(4, 0)
                     self.pacman.direction = 'right'
                     self.blinky.changedirection('right')
                     self.blinky.changestatus('vulnerable')
@@ -1207,14 +1386,14 @@ class Animator:
         # self.audio.background_src = 'pacman_chomp.ogg'
         # self.audio.toggle()
         pg.time.delay(1000)
-        self.surface.fill((0,0,0))
+        self.surface.fill((0, 0, 0))
         pg.display.update()
         pg.time.delay(1000)
         self.menu()
 
 
 def main():
-    maze = Maze(0, 0, 0, 0)
+    maze = Maze(0, 0)
     # animator = Animator(maze)
     # animator.animate()
     maze.update()
