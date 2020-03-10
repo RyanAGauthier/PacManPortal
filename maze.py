@@ -1,6 +1,7 @@
 import pygame as pg
 import sys
 from vector import Vector
+from random import randrange
 
 NODESIZE = 8
 
@@ -10,13 +11,14 @@ class Ghost(pg.sprite.Sprite):
     # The class inherits from sprite so that we can later use sprite.groupcollide() between pacman and each ghost
     # Each ghost can draw and update itself, currently it just needs to implement the state parameter, which is intended
     # to tell the ghost whether it is fleeing, respawning, just eyeballs, etc
-    def __init__(self, surface, name, images, rect, direction, state, selfnode, allnodes):
+    def __init__(self, surface, images, rect, direction, state, name=None, selfnode=None, allnodes=None):
         pg.sprite.Sprite.__init__(self)
         self.surface = surface
         self.name = name
         self.images = images
         self.currentframe = 0
         self.duration = 60
+        self.shopping = 0
         self.velocity = Vector()
         self.speed = 5
         self.image = images[self.currentframe]
@@ -66,7 +68,7 @@ class Ghost(pg.sprite.Sprite):
 
     def get_target(self):
         bestnode = self.targetnode
-        # If chasing
+        # CHASING
         if self.state == 'chasing':
             # If we are at our target node, get the next one
             if (self.allnodes[self.selfnode[0]][self.selfnode[1]] == self.targetnode) or (self.targetnode is None):
@@ -78,6 +80,141 @@ class Ghost(pg.sprite.Sprite):
                     else:
                         if (node.distfrompac < bestnode.distfrompac) and node.traversable:
                             bestnode = node
+
+        # RUNNING or VULNERABLE
+        if self.state == 'running' or self.state == 'vulnerable':
+            # If we are at our target node, get the next one
+            if (self.allnodes[self.selfnode[0]][self.selfnode[1]] == self.targetnode) or (
+                    self.targetnode is None):
+                # In all edgenodes/neighbors
+                for node in self.allnodes[self.selfnode[0]][self.selfnode[1]].edgeto:
+                    # Get the node with the largest distance
+                    if (bestnode is None) or (bestnode == self.targetnode):
+                        bestnode = node
+                    else:
+                        if (node.distfrompac > bestnode.distfrompac) and node.traversable:
+                            bestnode = node
+
+        # SHOPPING
+        if self.state == 'shopping':
+            # Neighbor nodes
+            up = down = left = right = None
+
+            # In all edgenodes/neighbors
+            for node in self.allnodes[self.selfnode[0]][self.selfnode[1]].edgeto:
+                # Determine direction of neighbor nodes
+                if node == self.allnodes[self.selfnode[0] - 1][self.selfnode[1]]:
+                    up = node
+                if node == self.allnodes[self.selfnode[0] + 1][self.selfnode[1]]:
+                    down = node
+                if node == self.allnodes[self.selfnode[0]][self.selfnode[1] + 1]:
+                    right = node
+                if node == self.allnodes[self.selfnode[0]][self.selfnode[1] - 1]:
+                    left = node
+
+            # If we are at our target node, get the next one
+            if (self.allnodes[self.selfnode[0]][self.selfnode[1]] == self.targetnode) or (
+                    self.targetnode is None):
+                shoptime = 8
+                # Depending on direction
+                if self.direction == 'up':
+                    # If cant continue in the direction, or shopping time is up, try to turn
+                    if (up is None) or (self.shopping == 0):
+                        # if pinky turn opposite to other ghosts
+                        if self.name == 'pinky':
+                            if left is not None:
+                                bestnode = left
+                            elif up is not None:
+                                bestnode = up
+                            else:
+                                bestnode = right
+                        else:
+                            if right is not None:
+                                bestnode = right
+                            elif up is not None:
+                                bestnode = up
+                            else:
+                                bestnode = left
+                        self.shopping = randrange(shoptime)
+                    # Unable to turn and can continue
+                    else:
+                        bestnode = up
+                        self.shopping -= 1
+                # Direction
+                elif self.direction == 'down':
+                    # If cant continue in the direction, or shopping time is up, try to turn
+                    if (down is None) or (self.shopping == 0):
+                        # if pinky turn opposite to other ghosts
+                        if self.name == 'pinky':
+                            if right is not None:
+                                bestnode = right
+                            elif down is not None:
+                                bestnode = down
+                            else:
+                                bestnode = left
+                        else:
+                            if left is not None:
+                                bestnode = left
+                            elif down is not None:
+                                bestnode = down
+                            else:
+                                bestnode = right
+                        self.shopping = randrange(shoptime)
+                    # Unable to turn and can continue
+                    else:
+                        bestnode = down
+                        self.shopping -= 1
+                # Direction
+                elif self.direction == 'right':
+                    # If cant continue in the direction, or shopping time is up, try to turn
+                    if (right is None) or (self.shopping == 0):
+                        # if pinky turn opposite to other ghosts
+                        if self.name == 'pinky':
+                            if up is not None:
+                                bestnode = up
+                            elif right is not None:
+                                bestnode = right
+                            else:
+                                bestnode = down
+                        else:
+                            if down is not None:
+                                bestnode = down
+                            elif right is not None:
+                                bestnode = right
+                            else:
+                                bestnode = up
+                        self.shopping = randrange(shoptime)
+                    # Unable to turn and can continue
+                    else:
+                        bestnode = right
+                        self.shopping -= 1
+                # Direction
+                elif self.direction == 'left':
+                    # If cant continue in the direction, or shopping time is up, try to turn
+                    if (left is None) or (self.shopping == 0):
+                        # if pinky turn opposite to other ghosts
+                        if self.name == 'pinky':
+                            if down is not None:
+                                bestnode = down
+                            elif left is not None:
+                                bestnode = left
+                            else:
+                                bestnode = up
+                        else:
+                            if up is not None:
+                                bestnode = up
+                            elif left is not None:
+                                bestnode = left
+                            else:
+                                bestnode = down
+                        self.shopping = randrange(shoptime)
+                    # Unable to turn and can continue
+                    else:
+                        bestnode = left
+                        self.shopping -= 1
+            else:
+                # Haven't reached target node
+                return bestnode
 
         return bestnode
 
@@ -143,7 +280,8 @@ class Ghost(pg.sprite.Sprite):
 
         if self.name == 'blinky':
             # Blinky is always chasing
-            self.changestate('chasing')
+            # self.changestate('chasing')
+            self.changestate('shopping')
 
         self.targetnode = self.get_target()
 
@@ -191,7 +329,7 @@ class Ghost(pg.sprite.Sprite):
         self.image = self.images[self.currentframe]
         # self.rect.left += self.velocity.x
         # self.rect.top += self.velocity.y
-        #print("displaying frame {}".format(self.currentframe))
+        # print("displaying frame {}".format(self.currentframe))
 
 
 # class DumbGhost(Ghost):
@@ -329,9 +467,9 @@ class DumbPacman(Pacman):
                          rect=rect, selfnode=selfnode, allnodes=allnodes)
 
     def move(self):
-        if self.velocity == Vector(0,-4) or self.velocity == Vector(0,4):
+        if self.velocity == Vector(0, -4) or self.velocity == Vector(0, 4):
             self.rect.top += self.velocity.y
-        elif self.velocity == Vector(4,0) or self.velocity == Vector(-4,0):
+        elif self.velocity == Vector(4, 0) or self.velocity == Vector(-4, 0):
             self.rect.left += self.velocity.x
 
     # def draw(self):
@@ -541,7 +679,7 @@ class Maze:
                                                   rect=temprect, color=(0, 0, 0), image=False, traversable=True))
                 elif self.currentline[i] == "G":
                     self.currentnodes.append(Node(surface=self.screen, nodesize=NODESIZE,
-                                                  rect=temprect, color=(255, 255, 255), image=False, traversable=True))
+                                                  rect=temprect, color=(255, 255, 255), image=False, traversable=False))
                 elif self.currentline[i] == "1":
                     self.blinky = Ghost(surface=self.screen, name='blinky', images=self.ghostimages["blinky"], direction="up",
                                         rect=pg.Rect(i * NODESIZE - NODESIZE/2, j * NODESIZE - NODESIZE/2, 14, 14),
@@ -657,8 +795,8 @@ class Animator:
                                  direction="left", rect=pg.Rect(400, 200, 60, 60), selfnode=(0, 0),
                                  allnodes=self.maze.pacmannodes)
         self.pacman.framecount = 2
-        self.blinky = Ghost(surface = self.animatedwindow, images=self.ghostimages["blinky"],
-                            rect=pg.Rect(600, 200, 60, 60), direction="left", state ="living")
+        self.blinky = Ghost(surface=self.animatedwindow, images=self.ghostimages["blinky"],
+                            rect=pg.Rect(600, 200, 60, 60), direction="left", state="living")
         self.inky = Ghost(surface=self.animatedwindow, images=self.ghostimages["inky"], direction="left",
                           rect=pg.Rect(660, 200, 60, 60),
                           state="living")
