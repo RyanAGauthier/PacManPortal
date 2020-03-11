@@ -208,6 +208,40 @@ class Ghost(pg.sprite.Sprite):
                 # Haven't reached target node
                 return bestnode
 
+        # DEAD
+        if self.status == 'dead':
+            if self.allnodes[self.selfnode[0]][self.selfnode[1]].distfromhome == 0:
+                self.changedirection('')
+                bestnode = None
+                y = 11
+                x1 = 13
+                home1 = self.allnodes[y][x1]
+                if self.rect.centerx != home1.rect.right:
+                    if self.rect.centerx < home1.rect.right:
+                        self.rect.centerx += 2
+                    else:
+                        self.rect.centerx -= 2
+                else:
+                    if self.rect.centery < self.allnodes[self.selfnode[0]+3][self.selfnode[1]].rect.centery:
+                        self.rect.centery += 2
+                    else:
+                        self.selfnode = (self.selfnode[0]+3, self.selfnode[1])
+                        self.changestatus('alive')
+                        self.changestate('spawing')
+                        self.changedirection('down')
+                return bestnode
+
+            # If we are at our target node, get the next one
+            if (self.allnodes[self.selfnode[0]][self.selfnode[1]] == self.targetnode) or (self.targetnode is None):
+                # In all edgenodes/neighbors
+                for node in self.allnodes[self.selfnode[0]][self.selfnode[1]].edgeto:
+                    # Get the node with the smallest distance
+                    if (bestnode is None) or (bestnode == self.targetnode):
+                        bestnode = node
+                    else:
+                        if (node.distfromhome < bestnode.distfromhome) and node.traversable:
+                            bestnode = node
+
         return bestnode
 
     def move(self):
@@ -216,6 +250,10 @@ class Ghost(pg.sprite.Sprite):
             self.rect.centerx += 1
         if self.rect.centery % 2 != 0:
             self.rect.centery += 1
+
+        if self.targetnode is None:
+            self.velocity = Vector(0, 0)
+            return
 
         leftneigh = 27 if self.selfnode[1] == 0 else self.selfnode[1] - 1
         rightneigh = 0 if self.selfnode[1] == 27 else self.selfnode[1] + 1
@@ -355,9 +393,8 @@ class Ghost(pg.sprite.Sprite):
 
     def update(self):
 
-        if self.name == 'blinky':
-            # Blinky is always chasing
-            self.changestate('chasing')
+        # if self.name == 'blinky':
+        #     pass
 
         self.targetnode = self.get_target()
         self.move()
@@ -615,6 +652,7 @@ class Node:
         self.traversable = traversable
         self.image = image
         self.distfrompac = 0
+        self.distfromhome = 0
         self.updated = False
         self.edgeto = []  # List of nodes that can be traveled to
 
@@ -676,6 +714,34 @@ def setdistance(node: Node):
             edgenode.distfrompac = node.distfrompac + 1
             edgenode.updated = True
             setdistance(edgenode)
+
+
+# Recursive driver to set nodes' distances from pacman
+def setdistancefromhome(nodes):
+    y = 11
+    x1, x2 = 13, 14
+    home1 = nodes[y][x1]
+    home2 = nodes[y][x2]
+    home1.updated = home2.updated = True
+    home1.distfromhome = home2.distfromhome = 0
+    setdistanceh(home1)
+    setdistanceh(home2)
+
+    # Reset updated in all nodes
+    for ylist in nodes:
+        for node in ylist:
+            node.updated = False
+
+
+# Recursively sets nodes' distance from pacman
+def setdistanceh(node: Node):
+    # For all edges in the node
+    for edgenode in node.edgeto:
+        # if the node has not been updated
+        if (not edgenode.updated) or (edgenode.distfromhome > node.distfromhome):
+            edgenode.distfromhome = node.distfromhome + 1
+            edgenode.updated = True
+            setdistanceh(edgenode)
 
 
 def ghostimages(spritesheet):
@@ -871,6 +937,7 @@ class Maze:
             # as a result of this, the node at [row][column] is located at position [y][x]
         self.f.close()
         linknodes(self.nodes)
+        setdistancefromhome(self.nodes)
 
         temptemprect = pg.Rect(0, 0, 13, 13)
         temptemprect.center = self.nodes[self.mytop][self.myleft].rect.center
@@ -1019,6 +1086,7 @@ class Maze:
                 # as a result of this, the node at [row][column] is located at position [y][x]
             self.f.close()
             linknodes(self.nodes)
+            setdistancefromhome(self.nodes)
             temptemprect = pg.Rect(0, 0, 13, 13)
             temptemprect.center = self.nodes[self.mytop][self.myleft].rect.center
             self.pacmannodes = self.nodes
