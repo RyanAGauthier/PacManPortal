@@ -5,7 +5,7 @@ from random import randrange
 
 
 NODESIZE = 8
-FPS = 33
+FPS = 24
 
 
 class Ghost(pg.sprite.Sprite):
@@ -34,6 +34,15 @@ class Ghost(pg.sprite.Sprite):
         self.status = status
         self.framecount = FPS // 3  # This dictates how many game frames should pass between different images
         self.frameclock = self.framecount
+        self.spawntimer = 0
+        self.behaviortimer = 0
+
+        if self.name == 'pinky':
+            self.spawntimer = 80
+        elif self.name == 'inky':
+            self.spawntimer = 160
+        elif self.name == 'clyde':
+            self.spawntimer = 240
 
     def changedirection(self, newdirection):
         self.direction = newdirection
@@ -57,6 +66,7 @@ class Ghost(pg.sprite.Sprite):
     def draw(self):
         self.surface.blit(self.image, self.rect)
 
+    # Based on ghost's state or status, determines next node to traverse to
     def get_target(self):
         bestnode = self.targetnode
 
@@ -74,7 +84,7 @@ class Ghost(pg.sprite.Sprite):
                             bestnode = node
 
         # RUNNING or VULNERABLE
-        if self.state == 'fleeing' or self.status == 'vulnerable':
+        if (self.state == 'fleeing') or (self.status == 'vulnerable'):
             # If we are at our target node, get the next one
             if (self.allnodes[self.selfnode[0]][self.selfnode[1]] == self.targetnode) or (
                     self.targetnode is None):
@@ -87,10 +97,37 @@ class Ghost(pg.sprite.Sprite):
                         if (node.distfrompac > bestnode.distfrompac) and node.traversable:
                             bestnode = node
 
+        if self.state == 'spawning':
+            if self.spawntimer != 0:
+                self.spawntimer -= 1
+            else:
+                if self.allnodes[self.selfnode[0]][self.selfnode[1]].distfromhome == 0:
+                    self.changedirection('')
+                    bestnode = None
+                    y = 14
+                    x = 13
+                    exit1 = self.allnodes[y][x]
+                    if self.rect.centerx != exit1.rect.right:
+                        if self.rect.centerx < exit1.rect.right:
+                            self.rect.centerx += 2
+                        else:
+                            self.rect.centerx -= 2
+                    else:
+                        if self.rect.centery > self.allnodes[y - 3][x].rect.centery:
+                            self.rect.centery -= 2
+                        else:
+                            self.selfnode = (y - 3, x)
+                            self.changestate('start')
+                            self.changedirection('down')
+                    return bestnode
+
         # SHOPPING
-        if self.state == 'shopping':
+        if (self.state == 'shopping') or (self.state == 'spawning'):
             # Neighbor nodes
             up = down = left = right = None
+
+            leftneigh = 27 if self.selfnode[1] == 0 else self.selfnode[1] - 1
+            rightneigh = 0 if self.selfnode[1] == 27 else self.selfnode[1] + 1
 
             # In all edgenodes/neighbors
             for node in self.allnodes[self.selfnode[0]][self.selfnode[1]].edgeto:
@@ -99,9 +136,9 @@ class Ghost(pg.sprite.Sprite):
                     up = node
                 if node == self.allnodes[self.selfnode[0] + 1][self.selfnode[1]]:
                     down = node
-                if node == self.allnodes[self.selfnode[0]][self.selfnode[1] + 1]:
+                if node == self.allnodes[self.selfnode[0]][rightneigh]:
                     right = node
-                if node == self.allnodes[self.selfnode[0]][self.selfnode[1] - 1]:
+                if node == self.allnodes[self.selfnode[0]][leftneigh]:
                     left = node
 
             # If we are at our target node, get the next one
@@ -166,15 +203,19 @@ class Ghost(pg.sprite.Sprite):
                                 bestnode = up
                             elif right is not None:
                                 bestnode = right
-                            else:
+                            elif down is not None:
                                 bestnode = down
+                            else:
+                                bestnode = left
                         else:
                             if down is not None:
                                 bestnode = down
                             elif right is not None:
                                 bestnode = right
-                            else:
+                            elif up is not None:
                                 bestnode = up
+                            else:
+                                bestnode = left
                         self.shopping = randrange(shoptime)
                     # Unable to turn and can continue
                     else:
@@ -190,15 +231,19 @@ class Ghost(pg.sprite.Sprite):
                                 bestnode = down
                             elif left is not None:
                                 bestnode = left
-                            else:
+                            elif up is not None:
                                 bestnode = up
+                            else:
+                                bestnode = right
                         else:
                             if up is not None:
                                 bestnode = up
                             elif left is not None:
                                 bestnode = left
-                            else:
+                            elif down is not None:
                                 bestnode = down
+                            else:
+                                bestnode = right
                         self.shopping = randrange(shoptime)
                     # Unable to turn and can continue
                     else:
@@ -227,8 +272,9 @@ class Ghost(pg.sprite.Sprite):
                     else:
                         self.selfnode = (self.selfnode[0]+3, self.selfnode[1])
                         self.changestatus('alive')
-                        self.changestate('spawing')
+                        self.changestate('spawning')
                         self.changedirection('down')
+                        self.spawntimer = 120
                 return bestnode
 
             # If we are at our target node, get the next one
@@ -391,12 +437,46 @@ class Ghost(pg.sprite.Sprite):
             self.frameclock -= 1
         self.image = self.images[self.currentframe]
 
+    # Updates states and status' depending on ghost, and calls movement and drawing methods
     def update(self):
 
-        # if self.name == 'blinky':
-        #     pass
+        # Initial properties set after spawn
+        if self.state == 'start':
+            if self.name != 'blinky':
+                self.behaviortimer = 200
+            self.state = 'chasing'
+
+        # "Timer" handling for ghosts with changing behaviors
+        if self.state == 'chasing' or self.state == 'shopping':
+            if self.name == 'pinky':
+                if self.behaviortimer > 160:
+                    self.state = 'shopping'
+                elif self.behaviortimer <= 0:
+                    self.behaviortimer = 200
+                else:
+                    self.state = 'chasing'
+                self.behaviortimer -= 1
+
+            if self.name == 'inky':
+                if self.behaviortimer > 100:
+                    self.state = 'chasing'
+                elif self.behaviortimer <= 0:
+                    self.behaviortimer = 200
+                else:
+                    self.state = 'shopping'
+                self.behaviortimer -= 1
+
+            if self.name == 'clyde':
+                if self.behaviortimer > 60:
+                    self.state = 'shopping'
+                elif self.behaviortimer <= 0:
+                    self.behaviortimer = 200
+                else:
+                    self.state = 'chasing'
+                self.behaviortimer -= 1
 
         self.targetnode = self.get_target()
+
         self.move()
         self.getimage()
         print("displaying frame {}".format(self.currentframe))
@@ -912,19 +992,19 @@ class Maze:
                 elif self.currentline[i] == "2":
                     self.clyde = Ghost(surface=self.screen, name='clyde', images=self.ghostimages["clyde"],
                                        direction="up", rect=pg.Rect(temprect.left - 15, temprect.top, 14, 14),
-                                       state="fleeing", status="alive", selfnode=(j, i), allnodes=self.nodes)
+                                       state="spawning", status="alive", selfnode=(j, i), allnodes=self.nodes)
                     self.currentnodes.append(Node(surface=self.screen, nodesize=NODESIZE, rect=temprect,
                                                   color=(0, 0, 0), image=False, traversable=True))
                 elif self.currentline[i] == "3":
                     self.inky = Ghost(surface=self.screen, name="inky", images=self.ghostimages["inky"],
                                       direction="up", rect=pg.Rect(temprect.left-7, temprect.top, 14, 14),
-                                      state="fleeing", status="alive", selfnode=(j, i), allnodes=self.nodes)
+                                      state="spawning", status="alive", selfnode=(j, i), allnodes=self.nodes)
                     self.currentnodes.append(Node(surface=self.screen, nodesize=NODESIZE, rect=temprect,
                                                   color=(0, 0, 0), image=False, traversable=True))
                 elif self.currentline[i] == "4":
                     self.pinky = Ghost(surface=self.screen, name='pinky', images=self.ghostimages["pinky"],
                                        direction="up", rect=pg.Rect(temprect.left+2, temprect.top, 14, 14),
-                                       state="fleeing", status="alive", selfnode=(j, i), allnodes=self.nodes)
+                                       state="spawning", status="alive", selfnode=(j, i), allnodes=self.nodes)
                     self.currentnodes.append(Node(surface=self.screen, nodesize=NODESIZE, rect=temprect,
                                                   color=(0, 0, 0), image=False, traversable=True))
                 elif self.currentline[i] == "@":
@@ -972,13 +1052,13 @@ class Maze:
                                 state="chasing", status="alive", selfnode=(11, 14), allnodes=self.nodes)
             self.clyde = Ghost(surface=self.screen, name='clyde', images=self.ghostimages["clyde"], direction="up",
                                rect=pg.Rect(13 * NODESIZE - 15, 14 * NODESIZE, 14, 14),
-                               state="fleeing", status="alive", selfnode=(14, 13), allnodes=self.nodes)
+                               state="spawning", status="alive", selfnode=(14, 13), allnodes=self.nodes)
             self.inky = Ghost(surface=self.screen, name='inky', images=self.ghostimages["inky"], direction="up",
                               rect=pg.Rect(14 * NODESIZE - 7, 14 * NODESIZE, NODESIZE, NODESIZE),
-                              state="fleeing", status="alive", selfnode=(14, 14), allnodes=self.nodes)
+                              state="spawning", status="alive", selfnode=(14, 14), allnodes=self.nodes)
             self.pinky = Ghost(surface=self.screen, name='pinky', images=self.ghostimages["pinky"], direction="up",
                                rect=pg.Rect(15 * NODESIZE + 2, 14 * NODESIZE, NODESIZE, NODESIZE),
-                               state="fleeing", status="alive", selfnode=(14, 15), allnodes=self.nodes)
+                               state="spawning", status="alive", selfnode=(14, 15), allnodes=self.nodes)
             self.ghosts.add(self.blinky, self.clyde, self.inky, self.pinky)
             self.screen.fill((0, 0, 0))
             for j in range(len(self.nodes)):
@@ -1048,7 +1128,7 @@ class Maze:
                     elif self.currentline[i] == "G":
                         self.currentnodes.append(Node(surface=self.screen, nodesize=NODESIZE,
                                                       rect=temprect, color=(255, 255, 255), image=False,
-                                                      traversable=True))
+                                                      traversable=False))
                     elif self.currentline[i] == "1":
                         self.blinky = Ghost(surface=self.screen, name='blinky', images=self.ghostimages["blinky"],
                                             direction="up",
@@ -1060,20 +1140,20 @@ class Maze:
                     elif self.currentline[i] == "2":
                         self.clyde = Ghost(surface=self.screen, name='clyde', images=self.ghostimages["clyde"],
                                            direction="up", rect=pg.Rect(temprect.left - 15, temprect.top, 14, 14),
-                                           state="fleeing", status="alive", selfnode=(j, i), allnodes=self.nodes)
+                                           state="spawning", status="alive", selfnode=(j, i), allnodes=self.nodes)
                         self.currentnodes.append(Node(surface=self.screen, nodesize=NODESIZE, rect=temprect,
                                                       color=(0, 0, 0), image=False, traversable=True))
                     elif self.currentline[i] == "3":
                         self.inky = Ghost(surface=self.screen, name="inky", images=self.ghostimages["inky"],
                                           direction="up",
                                           rect=pg.Rect(temprect.left - 7, temprect.top, 14, 14),
-                                          state="fleeing", status="alive", selfnode=(j, i), allnodes=self.nodes)
+                                          state="spawning", status="alive", selfnode=(j, i), allnodes=self.nodes)
                         self.currentnodes.append(Node(surface=self.screen, nodesize=NODESIZE, rect=temprect,
                                                       color=(0, 0, 0), image=False, traversable=True))
                     elif self.currentline[i] == "4":
                         self.pinky = Ghost(surface=self.screen, name='pinky', images=self.ghostimages["pinky"],
                                            direction="up", rect=pg.Rect(temprect.left + 2, temprect.top, 14, 14),
-                                           state="fleeing", status="alive", selfnode=(j, i), allnodes=self.nodes)
+                                           state="spawning", status="alive", selfnode=(j, i), allnodes=self.nodes)
                         self.currentnodes.append(Node(surface=self.screen, nodesize=NODESIZE, rect=temprect,
                                                       color=(0, 0, 0), image=False, traversable=True))
                     elif self.currentline[i] == "@":
@@ -1194,7 +1274,7 @@ class Maze:
             self.audio.play_sound('eatpowerpellet', args=True, loops=-1, maxtime=10000)
             ghostlist = [self.blinky, self.clyde, self.inky, self.pinky]
             for i in ghostlist:
-                if i.status != 'dead':
+                if (i.status != 'dead') and (i.state != 'spawning'):
                     i.changestatus('vulnerable')
                     i.duration = 10 * FPS
         temp = pg.sprite.spritecollideany(sprite=self.pacman, group=self.fruit)
